@@ -19,6 +19,7 @@ export interface RunAgentParams {
     workspace: string;
     client: LlmClient;
     observer?: AgentObserver;
+    context?: ContextManager;
 }
 
 export interface AgentMetrics {
@@ -45,7 +46,8 @@ function createModeConfig(mode: Mode): ModeConfig {
 
 export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
     const config = createModeConfig(params.mode);
-    const context = new ContextManager(config.systemPrompt(params.workspace));
+    const context = params.context ?? new ContextManager();
+    context.updateSystemPrompt(config.systemPrompt(params.workspace));
     context.append({ role: "user", content: params.task });
 
     let llmCalls = 0;

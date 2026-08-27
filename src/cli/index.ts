@@ -6,9 +6,13 @@ import { createInterface } from "node:readline/promises";
 import { isMode, MODES, type Mode } from "../modes/types.ts";
 import { createLlmClientFromEnv, type LlmClient } from "../llm/client.ts";
 import { runAgent, type AgentObserver, type AgentResult } from "../agent/agent-loop.ts";
+import { ContextManager } from "../agent/context-manager.ts";
+import { SessionStore } from "../session/store.ts";
+import type { SessionRecord } from "../session/types.ts";
 import {
     banner,
     helpText,
+    sessionsList,
     createAgentObserver,
     taskDone,
     maxRoundsReached,
@@ -21,6 +25,7 @@ interface CliOptions {
     model?: string;
     workspace: string;
     quiet?: boolean;
+    session?: string;
 }
 
 function validateOptions(options: CliOptions): void {
@@ -56,7 +61,12 @@ async function createClient(options: CliOptions): Promise<LlmClient> {
     return createLlmClientFromEnv(options.model === undefined ? {} : { model: options.model });
 }
 
-async function executeTask(task: string, options: CliOptions, clientOverride?: LlmClient): Promise<AgentResult> {
+async function executeTask(
+    task: string,
+    options: CliOptions,
+    context?: ContextManager,
+    clientOverride?: LlmClient,
+): Promise<AgentResult> {
     const client = clientOverride ?? (await createClient(options));
     return await runAgent({
         task,
@@ -65,7 +75,22 @@ async function executeTask(task: string, options: CliOptions, clientOverride?: L
         workspace: options.workspace,
         client,
         observer: createObserver(options),
+        context,
     });
+}
+
+async function saveSession(
+    store: SessionStore,
+    record: SessionRecord,
+    context: ContextManager,
+    params: { mode: Mode; model: string; workspace: string },
+): Promise<void> {
+    record.messages = context.getMessages();
+    record.mode = params.mode;
+    record.model = params.model;
+    record.workspace = params.workspace;
+    record.updatedAt = new Date().toISOString();
+    await store.save(record);
 }
 
 function renderResult(result: AgentResult, options: CliOptions): void {
@@ -81,9 +106,30 @@ function renderResult(result: AgentResult, options: CliOptions): void {
 }
 
 async function runOnce(task: string, options: CliOptions): Promise<void> {
-    const result = await executeTask(task, options);
+    const store = new SessionStore();
+    const client = await createClient(options);
+    let context: ContextManager | undefined;
+    let mode = options.mode as Mode;
+    let workspace = options.workspace;
+
+    let record: SessionRecord | null = null;
+    if (options.session !== undefined) {
+        record = await store.get(options.session);
+        if (record === null) {
+            throw new Error(`会话 ${options.session} 不存在`);
+        }
+        context = new ContextManager(record.messages);
+        mode = record.mode;
+        workspace = record.workspace;
+    }
+
+    const result = await executeTask(task, { ...options, mode, workspace }, context, client);
     console.log(result.finalMessage);
     console.log(JSON.stringify(result.metrics));
+
+    if (record !== null) {
+        await saveSession(store, record, context!, { mode, model: client.getModelName(), workspace });
+    }
 }
 
 async function runInteractive(options: CliOptions): Promise<void> {
@@ -92,9 +138,31 @@ async function runInteractive(options: CliOptions): Promise<void> {
         process.exit(0);
     });
 
-    let mode = options.mode as Mode;
+    const store = new SessionStore();
     const client = await createClient(options);
-    console.log(banner({ mode, model: client.getModelName(), workspace: options.workspace }));
+
+    let record: SessionRecord;
+    let context: ContextManager;
+    if (options.session !== undefined) {
+        const loaded = await store.get(options.session);
+        if (loaded === null) {
+            throw new Error(`会话 ${options.session} 不存在`);
+        }
+        record = loaded;
+        context = new ContextManager(record.messages);
+    } else {
+        record = store.createRecord({
+            workspace: options.workspace,
+            mode: options.mode as Mode,
+            model: client.getModelName(),
+        });
+        context = new ContextManager();
+    }
+
+    let mode = record.mode;
+    let workspace = record.workspace;
+
+    console.log(banner({ mode, model: client.getModelName(), workspace, sessionId: record.id }));
     console.log("");
 
     rl.setPrompt(`${mode}> `);
@@ -114,13 +182,62 @@ async function runInteractive(options: CliOptions): Promise<void> {
                             console.log(`当前模式：${mode}`);
                         } else if (isMode(arg)) {
                             mode = arg;
+                            record.mode = arg;
                             console.log(`模式已切换为 ${mode}`);
                         } else {
                             console.error(errorText(`无效模式：${arg}，有效值为 ${MODES.join(" 或 ")}`));
                         }
                         break;
+                    case "/sessions": {
+                        const records = await store.list();
+                        console.log(
+                            sessionsList(
+                                records.map((item) => ({
+                                    id: item.id,
+                                    workspace: item.workspace,
+                                    mode: item.mode,
+                                    messageCount: item.messages.length,
+                                    updatedAt: new Date(item.updatedAt).toLocaleString(),
+                                    current: item.id === record.id,
+                                })),
+                            ),
+                        );
+                        break;
+                    }
+                    case "/session": {
+                        if (arg.length === 0) {
+                            console.error(errorText("用法：/session <id>"));
+                            break;
+                        }
+                        const loaded = await store.get(arg);
+                        if (loaded === null) {
+                            console.error(errorText(`会话 ${arg} 不存在，/sessions 查看已有会话`));
+                            break;
+                        }
+                        await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
+                        record = loaded;
+                        context = new ContextManager(record.messages);
+                        mode = record.mode;
+                        workspace = record.workspace;
+                        console.log(`已切换会话 ${record.id}（模式 ${mode}，工作目录 ${workspace}）`);
+                        break;
+                    }
+                    case "/new": {
+                        await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
+                        record = store.createRecord({
+                            workspace: options.workspace,
+                            mode: options.mode as Mode,
+                            model: client.getModelName(),
+                        });
+                        context = new ContextManager();
+                        mode = record.mode;
+                        workspace = record.workspace;
+                        console.log(`已开始新会话 ${record.id}`);
+                        break;
+                    }
                     case "/quit":
                     case "/exit":
+                        await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
                         rl.close();
                         return;
                     default:
@@ -129,8 +246,8 @@ async function runInteractive(options: CliOptions): Promise<void> {
                 }
             } else {
                 try {
-                    const result = await executeTask(line, { ...options, mode }, client);
-                    renderResult(result, { ...options, mode });
+                    const result = await executeTask(line, { ...options, mode, workspace }, context, client);
+                    renderResult(result, { ...options, mode, workspace });
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error);
                     console.error(errorText(message));
@@ -140,6 +257,8 @@ async function runInteractive(options: CliOptions): Promise<void> {
         rl.setPrompt(`${mode}> `);
         rl.prompt();
     }
+
+    await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
 }
 
 const program = new Command();
@@ -154,6 +273,7 @@ program
     .option("--model <model>", "模型名称（覆盖环境变量 PCA_MODEL）")
     .option("-w, --workspace <path>", "工作目录", process.cwd())
     .option("-q, --quiet", "不显示过程日志，只输出结果")
+    .option("--session <id>", "恢复指定会话继续执行")
     .action(async (task: string | undefined, options: CliOptions) => {
         try {
             validateOptions(options);

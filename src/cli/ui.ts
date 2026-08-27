@@ -31,14 +31,41 @@ export function formatArgs(rawArguments: string): string {
     return parts.join(", ");
 }
 
-export function banner(params: { mode: string; model: string; workspace: string }): string {
+export function banner(params: { mode: string; model: string; workspace: string; sessionId?: string }): string {
     const lines = [
         pc.bold("programmatic-coding-agent") + pc.dim(` v0.1.0`),
         `${pc.dim("模式")} ${params.mode}  ${pc.dim("模型")} ${params.model}`,
         `${pc.dim("工作目录")} ${params.workspace}`,
-        pc.dim("输入任务开始执行，/help 查看命令，Ctrl+C 退出"),
     ];
+    if (params.sessionId !== undefined) {
+        lines.push(`${pc.dim("会话")} ${params.sessionId}`);
+    }
+    lines.push(pc.dim("输入任务开始执行，/help 查看命令，Ctrl+C 退出"));
     return lines.join("\n");
+}
+
+export interface SessionSummary {
+    id: string;
+    workspace: string;
+    mode: string;
+    messageCount: number;
+    updatedAt: string;
+    current: boolean;
+}
+
+export function sessionsList(records: SessionSummary[]): string {
+    if (records.length === 0) {
+        return "暂无已保存的会话";
+    }
+    const rows = records.map((record) => {
+        const marker = record.current ? pc.green(" *") : "";
+        return [
+            `${pc.cyan(record.id)}${marker}`,
+            pc.dim(`模式 ${record.mode} · 消息 ${record.messageCount} 条 · 更新于 ${record.updatedAt}`),
+            pc.dim(record.workspace),
+        ].join("\n");
+    });
+    return rows.join("\n\n");
 }
 
 export function roundHeader(round: number, maxRounds: number): string {
@@ -86,6 +113,9 @@ export function helpText(currentMode: string): string {
     return [
         pc.bold("可用命令"),
         pc.cyan("/help") + pc.dim("          显示本帮助"),
+        pc.cyan("/sessions") + pc.dim("       列出已保存的会话"),
+        pc.cyan("/session <id>") + pc.dim("   切换并恢复指定会话"),
+        pc.cyan("/new") + pc.dim("           保存当前会话并开始新会话"),
         pc.cyan("/mode") + pc.dim("          显示当前模式"),
         pc.cyan("/mode tool") + pc.dim("    切换为 Tool Calling 模式"),
         pc.cyan("/mode code") + pc.dim("    切换为 Code Mode"),

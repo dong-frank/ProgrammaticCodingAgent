@@ -3,16 +3,25 @@ import type { ChatMessage } from "../llm/types.ts";
 export const MAX_HISTORY_MESSAGES = 200;
 
 export class ContextManager {
-    private readonly messages: ChatMessage[] = [];
+    private readonly messages: ChatMessage[];
 
-    constructor(systemPrompt: string) {
-        this.messages.push({ role: "system", content: systemPrompt });
+    constructor(initialMessages: ChatMessage[] = []) {
+        this.messages = [...initialMessages];
     }
 
     append(message: ChatMessage): void {
         this.messages.push(message);
         if (this.messages.length > MAX_HISTORY_MESSAGES) {
             this.trim();
+        }
+    }
+
+    updateSystemPrompt(content: string): void {
+        const first = this.messages[0];
+        if (first !== undefined && first.role === "system") {
+            first.content = content;
+        } else {
+            this.messages.unshift({ role: "system", content });
         }
     }
 
