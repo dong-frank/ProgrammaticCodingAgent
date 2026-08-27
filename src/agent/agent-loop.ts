@@ -1,10 +1,9 @@
 import type { LlmClient } from "../llm/client.ts";
-import { createDefaultRegistry, type ToolRegistry } from "../tools/registry.ts";
-import type { Mode } from "../modes/types.ts";
-import { runToolModeStep } from "../modes/tool-mode.ts";
-import { runCodeModeStep } from "../modes/code-mode.ts";
+import { executeTool } from "../tools/registry.ts";
+import type { Mode, ModeConfig } from "../modes/types.ts";
+import { createToolModeConfig } from "../modes/tool-mode.ts";
+import { createCodeModeConfig } from "../modes/code-mode.ts";
 import { ContextManager } from "./context-manager.ts";
-import { buildSystemPrompt } from "./system-prompt.ts";
 
 export interface RunAgentParams {
     task: string;
@@ -29,9 +28,16 @@ export interface AgentResult {
     metrics: AgentMetrics;
 }
 
+function createModeConfig(mode: Mode): ModeConfig {
+    if (mode === "tool") {
+        return createToolModeConfig();
+    }
+    return createCodeModeConfig();
+}
+
 export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
-    const registry: ToolRegistry = createDefaultRegistry();
-    const context = new ContextManager(buildSystemPrompt(params.workspace, registry.listNames()));
+    const config = createModeConfig(params.mode);
+    const context = new ContextManager(config.systemPrompt(params.workspace));
     context.append({ role: "user", content: params.task });
 
     let llmCalls = 0;
@@ -44,7 +50,7 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
     for (let round = 1; round <= params.maxRounds; round += 1) {
         const response = await params.client.chat({
             messages: context.getMessages(),
-            tools: registry.listSchemas(),
+            tools: config.registry.listSchemas(),
         });
         llmCalls += 1;
         promptTokens += response.usage.promptTokens;
@@ -69,16 +75,12 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
             };
         }
 
-        if (params.mode === "tool") {
-            const outcome = await runToolModeStep({
-                response,
-                context,
-                registry,
-                toolCtx: { cwd: params.workspace },
+        for (const call of calls) {
+            const result = await executeTool(config.registry, call.function.name, call.function.arguments, {
+                cwd: params.workspace,
             });
-            toolCalls += outcome.toolCalls;
-        } else {
-            runCodeModeStep();
+            context.append({ role: "tool", tool_call_id: call.id, content: result.content });
+            toolCalls += 1;
         }
     }
 

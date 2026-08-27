@@ -1,8 +1,23 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { ToolDefinition, ToolResult } from "./types.ts";
+import type { ToolDefinition } from "./types.ts";
 
-export const MAX_READ_BYTES = 200_000;
+export const MAX_READ_CHARS = 200_000;
+
+export async function readFileText(filePath: string, cwd: string): Promise<string> {
+    const absolutePath = path.resolve(cwd, filePath);
+    let content: string;
+    try {
+        content = await readFile(absolutePath, "utf8");
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`读取失败：${message}`);
+    }
+    if (content.length > MAX_READ_CHARS) {
+        content = `${content.slice(0, MAX_READ_CHARS)}\n[内容已截断]`;
+    }
+    return content;
+}
 
 export function readFileTool(): ToolDefinition {
     return {
@@ -21,21 +36,13 @@ export function readFileTool(): ToolDefinition {
             if (typeof filePath !== "string" || filePath.length === 0) {
                 throw new Error("read_file 参数 path 必须是非空字符串");
             }
-            const absolutePath = path.resolve(ctx.cwd, filePath);
-            let content: string;
             try {
-                content = await readFile(absolutePath, "utf8");
+                const content = await readFileText(filePath, ctx.cwd);
+                return { content };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                return { content: `读取失败：${message}` };
+                return { content: message };
             }
-            if (content.length > MAX_READ_BYTES) {
-                content = `${content.slice(0, MAX_READ_BYTES)}\n[内容已截断]`;
-            }
-            const result: ToolResult = {
-                content,
-            };
-            return result;
         },
     };
 }

@@ -4,15 +4,15 @@ import type { ToolDefinition } from "./types.ts";
 export const SHELL_TIMEOUT_MS = 60_000;
 export const MAX_OUTPUT_CHARS = 20_000;
 
-interface ExecOutcome {
+export interface ShellOutcome {
     stdout: string;
     stderr: string;
     exitCode: number;
     timedOut: boolean;
 }
 
-function runShellCommand(command: string, cwd: string): Promise<ExecOutcome> {
-    return new Promise((resolve, reject) => {
+export function runShellCommand(command: string, cwd: string): Promise<ShellOutcome> {
+    return new Promise((resolve) => {
         exec(
             command,
             {

@@ -1,6 +1,18 @@
 import fg from "fast-glob";
 import type { ToolDefinition } from "./types.ts";
 
+export async function matchGlob(pattern: string, cwd: string): Promise<string[]> {
+    let matches: string[];
+    try {
+        matches = await fg(pattern, { cwd, onlyFiles: true });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`匹配失败：${message}`);
+    }
+    matches.sort();
+    return matches;
+}
+
 export function globTool(): ToolDefinition {
     return {
         name: "glob",
@@ -18,18 +30,16 @@ export function globTool(): ToolDefinition {
             if (typeof pattern !== "string" || pattern.length === 0) {
                 throw new Error("glob 参数 pattern 必须是非空字符串");
             }
-            let matches: string[];
             try {
-                matches = await fg(pattern, { cwd: ctx.cwd, onlyFiles: true });
+                const matches = await matchGlob(pattern, ctx.cwd);
+                if (matches.length === 0) {
+                    return { content: "没有匹配到任何文件" };
+                }
+                return { content: matches.join("\n") };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                return { content: `匹配失败：${message}` };
+                return { content: message };
             }
-            matches.sort();
-            if (matches.length === 0) {
-                return { content: "没有匹配到任何文件" };
-            }
-            return { content: matches.join("\n") };
         },
     };
 }

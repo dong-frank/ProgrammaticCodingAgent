@@ -2,6 +2,17 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ToolDefinition } from "./types.ts";
 
+export async function writeFileText(filePath: string, content: string, cwd: string): Promise<void> {
+    const absolutePath = path.resolve(cwd, filePath);
+    try {
+        await mkdir(path.dirname(absolutePath), { recursive: true });
+        await writeFile(absolutePath, content, "utf8");
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`写入失败：${message}`);
+    }
+}
+
 export function writeFileTool(): ToolDefinition {
     return {
         name: "write_file",
@@ -24,15 +35,13 @@ export function writeFileTool(): ToolDefinition {
             if (typeof content !== "string") {
                 throw new Error("write_file 参数 content 必须是字符串");
             }
-            const absolutePath = path.resolve(ctx.cwd, filePath);
             try {
-                await mkdir(path.dirname(absolutePath), { recursive: true });
-                await writeFile(absolutePath, content, "utf8");
+                await writeFileText(filePath, content, ctx.cwd);
+                return { content: `文件写入完成：${filePath}` };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                return { content: `写入失败：${message}` };
+                return { content: message };
             }
-            return { content: `文件写入完成：${filePath}` };
         },
     };
 }

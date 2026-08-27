@@ -15,10 +15,10 @@
     "commander": "^13.1.0",
     "dotenv": "^17.4.2",
     "fast-glob": "^3.3.3",
-    "openai": "^7.7.0"
+    "openai": "^7.7.0",
+    "typescript": "^5.9.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "typescript": "^5.9.0"
+    "@types/node": "^22.10.0"
   }
 }
