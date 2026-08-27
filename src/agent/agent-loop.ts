@@ -5,12 +5,20 @@ import { createToolModeConfig } from "../modes/tool-mode.ts";
 import { createCodeModeConfig } from "../modes/code-mode.ts";
 import { ContextManager } from "./context-manager.ts";
 
+export interface AgentObserver {
+    onRoundStart?: (round: number, maxRounds: number) => void;
+    onModelText?: (content: string) => void;
+    onToolCall?: (name: string, rawArguments: string) => void;
+    onToolResult?: (content: string) => void;
+}
+
 export interface RunAgentParams {
     task: string;
     mode: Mode;
     maxRounds: number;
     workspace: string;
     client: LlmClient;
+    observer?: AgentObserver;
 }
 
 export interface AgentMetrics {
@@ -48,6 +56,8 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
     const startedAt = Date.now();
 
     for (let round = 1; round <= params.maxRounds; round += 1) {
+        params.observer?.onRoundStart?.(round, params.maxRounds);
+
         const response = await params.client.chat({
             messages: context.getMessages(),
             tools: config.registry.listSchemas(),
@@ -61,6 +71,9 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
 
         const calls = response.message.tool_calls;
         if (calls === undefined || calls.length === 0) {
+            if (response.message.content !== null && response.message.content.length > 0) {
+                params.observer?.onModelText?.(response.message.content);
+            }
             return {
                 finalMessage: response.message.content ?? "",
                 stoppedReason: "completed",
@@ -76,9 +89,11 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
         }
 
         for (const call of calls) {
+            params.observer?.onToolCall?.(call.function.name, call.function.arguments);
             const result = await executeTool(config.registry, call.function.name, call.function.arguments, {
                 cwd: params.workspace,
             });
+            params.observer?.onToolResult?.(result.content);
             context.append({ role: "tool", tool_call_id: call.id, content: result.content });
             toolCalls += 1;
         }

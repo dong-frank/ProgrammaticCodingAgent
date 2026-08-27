@@ -28,6 +28,10 @@ export class LlmClient {
         });
     }
 
+    getModelName(): string {
+        return this.model;
+    }
+
     async chat(request: ChatRequest): Promise<ChatResult> {
         let completion: OpenAI.Chat.Completions.ChatCompletion;
         try {

@@ -7,6 +7,9 @@
   "engines": {
     "node": ">=22.18.0"
   },
+  "bin": {
+    "pca": "src/cli/index.ts"
+  },
   "scripts": {
     "start": "node src/cli/index.ts",
     "typecheck": "tsc"
@@ -16,6 +19,7 @@
     "dotenv": "^17.4.2",
     "fast-glob": "^3.3.3",
     "openai": "^7.7.0",
+    "picocolors": "^1.1.1",
     "typescript": "^5.9.0"
   },
   "devDependencies": {
