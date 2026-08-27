@@ -1,20 +1,10 @@
 import fg from "fast-glob";
 import type { ToolDefinition } from "./types.ts";
 
-export const DEFAULT_GLOB_IGNORES = [
-    "**/node_modules/**",
-    "**/.git/**",
-    "**/dist/**",
-    "**/build/**",
-    "**/.venv/**",
-    "**/.dsh/**",
-];
-
 export async function matchGlob(pattern: string, cwd: string, ignore?: string[]): Promise<string[]> {
-    const ignoreList = ignore ?? DEFAULT_GLOB_IGNORES;
     let matches: string[];
     try {
-        matches = await fg(pattern, { cwd, onlyFiles: true, ignore: ignoreList });
+        matches = await fg(pattern, { cwd, onlyFiles: true, ignore });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`匹配失败：${message}`);
@@ -27,7 +17,7 @@ export function globTool(): ToolDefinition {
     return {
         name: "glob",
         description:
-            "按通配符模式匹配工作目录下的文件路径，返回匹配到的路径列表。默认忽略 node_modules、.git、dist、build、.venv、.dsh 等目录下的文件；如需包含这些目录，请传入空数组作为 ignore。",
+            "按通配符模式匹配工作目录下的文件路径，返回匹配到的路径列表。如需排除某些目录（如 node_modules、.git），通过 ignore 参数传入要排除的模式列表。",
         parameters: {
             type: "object",
             properties: {
@@ -35,7 +25,7 @@ export function globTool(): ToolDefinition {
                 ignore: {
                     type: "array",
                     items: { type: "string" },
-                    description: "额外排除的模式列表；传空数组表示不排除（包含依赖目录）",
+                    description: "要排除的模式列表，例如 [\"**/node_modules/**\", \"**/.git/**\"]；不传则不排除",
                 },
             },
             required: ["pattern"],
@@ -51,8 +41,7 @@ export function globTool(): ToolDefinition {
                 if (!Array.isArray(args.ignore) || args.ignore.some((entry) => typeof entry !== "string")) {
                     throw new Error("glob 参数 ignore 必须是由字符串组成的数组");
                 }
-                const custom = args.ignore as string[];
-                ignore = custom.length === 0 ? [] : [...custom, ...DEFAULT_GLOB_IGNORES];
+                ignore = args.ignore as string[];
             }
             try {
                 const matches = await matchGlob(pattern, ctx.cwd, ignore);
