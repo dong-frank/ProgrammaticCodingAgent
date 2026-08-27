@@ -1,12 +1,11 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# Node
+node_modules/
+*.tsbuildinfo
 
-# Virtual environments
-.venv
+# 环境与凭据
+.env
+.env.local
 
+
+# 论文题目
 *.pdf

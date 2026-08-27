@@ -1,0 +1,21 @@
+{
+  "name": "programmatic-coding-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "从零实现的编程智能体：Tool Calling 与 Code Mode 对照实验",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node src/cli/index.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.0"
+  }
+}
