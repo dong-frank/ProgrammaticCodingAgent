@@ -6,6 +6,8 @@ node_modules/
 .env
 .env.local
 
+# 测试工作目录
+.workspace/
 
 # 论文题目
 *.pdf
