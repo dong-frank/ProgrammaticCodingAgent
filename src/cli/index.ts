@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import "dotenv/config";
 import { Command } from "commander";
 import { isMode, MODES } from "../modes/types.ts";
 import { createLlmClientFromEnv } from "../llm/client.ts";
