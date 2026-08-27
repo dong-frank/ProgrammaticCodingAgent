@@ -12,7 +12,7 @@ export interface AgentApi {
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
     shell: (command: string) => Promise<ShellOutcome>;
-    glob: (pattern: string) => Promise<string[]>;
+    glob: (pattern: string, ignore?: string[]) => Promise<string[]>;
     calls: ToolCallRecord[];
 }
 
@@ -34,8 +34,8 @@ export function createAgentApi(cwd: string): AgentApi {
             calls.push({ name: "shell", summary: `执行命令，退出码 ${outcome.exitCode}` });
             return outcome;
         },
-        async glob(pattern) {
-            const matches = await matchGlob(pattern, cwd);
+        async glob(pattern, ignore) {
+            const matches = await matchGlob(pattern, cwd, ignore);
             calls.push({ name: "glob", summary: `匹配 ${pattern}，共 ${matches.length} 个路径` });
             return matches;
         },
