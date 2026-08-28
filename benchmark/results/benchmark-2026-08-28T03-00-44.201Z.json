@@ -1,0 +1,34 @@
+[
+  {
+    "taskId": "single-func-fix",
+    "taskName": "单函数修复",
+    "mode": "tool",
+    "success": true,
+    "verifyOutput": "single-func-fix 验收通过\n",
+    "finalMessage": "已修复 `src/math.js` 中的 `add` 函数。\n\n**修改内容**：将错误的实现 `return a - b;` 改为正确的 `return a + b;`。\n\n**验证结果**：\n- `add(2, 3)` 返回 `5` ✓\n- `add(10, -5)` 返回 `5` ✓\n\n函数现在能正确接收两个数字参数并返回它们的和。",
+    "llmCalls": 4,
+    "toolCalls": 3,
+    "errorRecoveryEvents": 0,
+    "promptTokens": 3907,
+    "completionTokens": 349,
+    "totalTokens": 4256,
+    "durationMs": 12157,
+    "apiDurationMs": 12102
+  },
+  {
+    "taskId": "single-func-fix",
+    "taskName": "单函数修复",
+    "mode": "code",
+    "success": true,
+    "verifyOutput": "single-func-fix 验收通过\n",
+    "finalMessage": "已修复。\n\n我查看了 `src/math.js`，发现 `add` 函数原本的错误实现是 `return a - b`（返回两数之差）。我已将其改为 `return a + b`，使 `add` 函数接收两个数字参数并正确返回它们的和，其余代码保持不变。",
+    "llmCalls": 3,
+    "toolCalls": 2,
+    "errorRecoveryEvents": 0,
+    "promptTokens": 2603,
+    "completionTokens": 245,
+    "totalTokens": 2848,
+    "durationMs": 6350,
+    "apiDurationMs": 6311
+  }
+]

@@ -271,7 +271,7 @@ program
     .description("programmatic-coding-agent：从零实现的编程智能体，支持 Tool Calling 与 Code Mode")
     .version("0.1.0")
     .argument("[task]", "要执行的任务；不提供时进入交互模式")
-    .option("-m, --mode <mode>", `执行模式：${MODES.join(" 或 ")}`, "code")
+    .option("-m, --mode <mode>", "执行模式：tool 或 code（benchmark 子命令下可为 all）")
     .option("-r, --max-rounds <rounds>", "最大循环轮次", "50")
     .option("--model <model>", "模型名称（覆盖环境变量 PCA_MODEL）")
     .option("-w, --workspace <path>", "工作目录", process.cwd())
@@ -279,11 +279,12 @@ program
     .option("--session <id>", "恢复指定会话继续执行")
     .action(async (task: string | undefined, options: CliOptions) => {
         try {
-            validateOptions(options);
+            const resolved = { ...options, mode: options.mode ?? "code" };
+            validateOptions(resolved);
             if (task === undefined) {
-                await runInteractive(options);
+                await runInteractive(resolved);
             } else {
-                await runOnce(task, options);
+                await runOnce(task, resolved);
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -295,18 +296,18 @@ program
 program
     .command("benchmark")
     .description("运行 Tool Calling 与 Code Mode 对照实验")
-    .option("--mode <mode>", "只运行指定模式：tool、code 或 all", "all")
     .option("--task <task>", "只运行指定任务 id")
     .option("--max-rounds <rounds>", "覆盖任务定义的轮次上限")
     .option("--model <model>", "模型名称（覆盖环境变量 PCA_MODEL）")
     .option("--reset", "只重建任务初始工作区，不运行实验")
     .action(
-        async (options: { mode: string; task?: string; maxRounds?: string; model?: string; reset?: boolean }) => {
+        async (options: { task?: string; maxRounds?: string; model?: string; reset?: boolean }) => {
             try {
-                if (options.mode !== "all" && !isMode(options.mode)) {
-                    throw new Error(`无效模式：${options.mode}，有效值为 all、tool 或 code`);
+                const selectedMode = program.opts().mode ?? "all";
+                if (selectedMode !== "all" && !isMode(selectedMode)) {
+                    throw new Error(`无效模式：${selectedMode}，有效值为 all、tool 或 code`);
                 }
-                const modes: Mode[] = options.mode === "all" ? ["tool", "code"] : [options.mode as Mode];
+                const modes: Mode[] = selectedMode === "all" ? ["tool", "code"] : [selectedMode as Mode];
                 const maxRoundsOverride =
                     options.maxRounds === undefined ? undefined : parseMaxRounds(options.maxRounds);
                 const client = createLlmClientFromEnv(options.model === undefined ? {} : { model: options.model });

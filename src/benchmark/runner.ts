@@ -2,7 +2,9 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { LlmClient } from "../llm/client.ts";
 import type { Mode } from "../modes/types.ts";
+import type { ChatMessage } from "../llm/types.ts";
 import { runAgent, type AgentObserver } from "../agent/agent-loop.ts";
+import { ContextManager } from "../agent/context-manager.ts";
 import { runShellCommand } from "../tools/shell.ts";
 import type { BenchmarkTask } from "./task.ts";
 
@@ -33,9 +35,11 @@ export interface BenchmarkRunResult {
     taskId: string;
     taskName: string;
     mode: Mode;
+    workspace: string;
     success: boolean;
     verifyOutput: string;
     finalMessage: string;
+    trace: ChatMessage[];
     llmCalls: number;
     toolCalls: number;
     errorRecoveryEvents: number;
@@ -58,6 +62,7 @@ export async function runTask(task: BenchmarkTask, mode: Mode, options: RunTaskO
     const workspace = await prepareWorkspace(task, workspaceRoot, mode);
     const maxRounds = options.maxRoundsOverride ?? task.maxRounds;
 
+    const context = new ContextManager();
     const startedAt = Date.now();
     const agentResult = await runAgent({
         task: task.description,
@@ -66,6 +71,7 @@ export async function runTask(task: BenchmarkTask, mode: Mode, options: RunTaskO
         workspace,
         client: options.client,
         observer: options.observer,
+        context,
     });
     const durationMs = Date.now() - startedAt;
 
@@ -80,9 +86,11 @@ export async function runTask(task: BenchmarkTask, mode: Mode, options: RunTaskO
         taskId: task.id,
         taskName: task.name,
         mode,
+        workspace,
         success,
         verifyOutput,
         finalMessage: agentResult.finalMessage,
+        trace: context.getMessages(),
         llmCalls: agentResult.metrics.llmCalls,
         toolCalls: agentResult.metrics.toolCalls,
         errorRecoveryEvents: agentResult.metrics.errorRecoveryEvents,
