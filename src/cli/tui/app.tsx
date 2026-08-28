@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Box, Text, Static, useApp, render } from "ink";
+import { Box, Text, Static, useApp, useStdout, render } from "ink";
 import TextInput from "ink-text-input";
 import { runAgent, type AgentObserver, type AgentMetrics } from "../../agent/agent-loop.ts";
 import { ContextManager } from "../../agent/context-manager.ts";
@@ -100,7 +100,9 @@ export async function startInteractive(params: StartInteractiveParams): Promise<
 
 export function App(props: AppProps): React.ReactElement {
     const { exit } = useApp();
+    const { stdout } = useStdout();
     const { client, store, options } = props;
+    const separatorWidth = Math.max(20, (stdout.columns ?? 80) - 4);
 
     const [recordId, setRecordId] = useState(props.initialRecord.id);
     const [mode, setMode] = useState<Mode>(props.initialRecord.mode);
@@ -287,6 +289,7 @@ export function App(props: AppProps): React.ReactElement {
             <Box borderStyle="round" borderColor="cyan" paddingX={1}>
                 <Box flexDirection="column" width="100%">
                     <Text color={running ? "yellow" : undefined}>{`${mode}> `}<TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus /></Text>
+                    <Text color="gray">{`\u2500`.repeat(separatorWidth)}</Text>
                     <Text color="gray">
                         会话 {recordId} ｜ 模型 {client.getModelName()} ｜ 工作目录 {workspace}
                     </Text>
