@@ -32,6 +32,8 @@ cp .env.example .env
 
 ## 运行
 
+命令名 `pca` 在项目内通过 `package.json` 的 `bin` 字段声明。未全局安装时，实际运行入口是 `npm start`（等价于 `node src/cli/index.ts`），`npm start -- <参数>` 把参数传给程序。若执行 `npm link` 或 `npm install -g .` 全局安装后，则可以直接使用 `pca <参数>`。
+
 ### 一次性执行
 
 ```bash
@@ -100,10 +102,10 @@ src/
 ## 对照实验
 
 ```bash
-pca benchmark                         # 全部任务 × 两种模式
-pca benchmark --task single-func-fix  # 只运行指定任务
-pca benchmark --mode tool             # 只运行指定模式（tool / code / all）
-pca benchmark --reset                 # 只重建任务初始工作区，不运行实验
+npm start -- benchmark                          # 全部任务 × 两种模式
+npm start -- benchmark --task single-func-fix   # 只运行指定任务
+npm start -- benchmark --mode tool              # 只运行指定模式（tool / code / all）
+npm start -- benchmark --reset                  # 只重建任务初始工作区，不运行实验
 ```
 
 任务定义位于 `benchmark/tasks/<任务 id>/`：`task.json` 提供任务描述与初始文件，`verify.mjs` 是独立验收脚本。每次运行自动重建隔离工作区（`.workspace/benchmark/`），保证两种模式从同一初始状态开始；运行后按任务对比两模式的模型调用、工具调用、错误恢复次数、token、端到端与模型 API 耗时，结果保存到 `benchmark/results/`。
