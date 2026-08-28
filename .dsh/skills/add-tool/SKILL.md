@@ -74,17 +74,17 @@ registry.register(myTool());
 
 `src/tools/api.ts` 三处改动：
 
-1. `AgentApi` 接口增加方法（TypeScript 类型即契约）：
+1. `AgentApi` 接口增加方法（TypeScript 类型即契约）。API 使用参数对象，字段与工具参数 schema 对齐命名（两种模式是同一份 schema 的两个投影）：
 
 ```typescript
-myOp: (path: string) => Promise<...>;
+myOp: (args: { path: string }) => Promise<...>;
 ```
 
 2. `createAgentApi` 中实现该方法，调用底层核心函数，并记录调用摘要：
 
 ```typescript
-async myOp(arg) {
-    const result = await coreOperation(arg, cwd);
+async myOp(args) {
+    const result = await coreOperation(args.path, cwd);
     calls.push({ name: "myOp", summary: `……` });
     return result;
 }

@@ -4,7 +4,7 @@ import { writeFileTool } from "./write-file.ts";
 import { editTool } from "./edit.ts";
 import { shellTool } from "./shell.ts";
 import { globTool } from "./glob.ts";
-import { formatParameterList } from "./tool-schema.ts";
+import { renderParametersObjectType } from "./tool-schema.ts";
 import type { ToolDefinition } from "./types.ts";
 
 // API 与底层工具模块的对应关系：schema 的每个部分都取自定义链路上
@@ -32,7 +32,10 @@ function entries(): Array<{ name: string; returnType: string; tool: ToolDefiniti
 
 export function renderAgentApiDeclarations(): string {
     const functions = entries()
-        .map((entry) => `declare function ${entry.name}(${formatParameterList(entry.tool)}): ${entry.returnType};`)
+        .map(
+            (entry) =>
+                `declare function ${entry.name}(args: ${renderParametersObjectType(entry.tool.parameters)}): ${entry.returnType};`,
+        )
         .join("\n");
     return `${functions}\n${CONSOLE_DECLARATION}`;
 }
@@ -40,7 +43,9 @@ export function renderAgentApiDeclarations(): string {
 export function renderAgentApiUsageGuide(): string {
     const lines = entries().map(
         (entry) =>
-            `- ${entry.name}(${formatParameterList(entry.tool)}): ${entry.returnType} —— ${entry.tool.description}`,
+            `- ${entry.name}(args: ${renderParametersObjectType(entry.tool.parameters)}): ${entry.returnType} —— ${entry.tool.description}`,
     );
-    return ["程序内可直接使用以下全局函数（无需 import，支持 await）：", ...lines].join("\n");
+    return ["程序内可直接使用以下全局函数（无需 import，支持 await），args 为参数对象，字段与工具参数一致：", ...lines].join(
+        "\n",
+    );
 }

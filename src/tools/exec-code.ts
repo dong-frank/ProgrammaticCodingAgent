@@ -7,7 +7,7 @@ export function execCodeTool(): ToolDefinition {
     return {
         name: "exec_code",
         description:
-            "执行一段 TypeScript 程序。程序内可直接使用全局异步函数：readFile(path) 返回文件内容字符串，writeFile(path, content) 写入文件，shell(command) 执行命令并返回 {stdout, stderr, exitCode, timedOut}，glob(pattern, ignore?) 返回匹配路径数组（ignore 为要排除的模式列表，例如排除依赖目录时传 [\"**/node_modules/**\", \"**/.git/**\"]）。无需 import，支持 await 与顶层 await。程序会先经过语法与类型验证，验证失败会返回具体错误。程序完成后返回标准输出、返回值、程序内工具调用记录与错误信息。",
+            "执行一段 TypeScript 程序。程序内可直接使用全局异步函数（无需 import，支持 await 与顶层 await），所有函数的参数都是参数对象，字段与工具参数一致：readFile({ path }) 返回文件内容字符串，writeFile({ path, content }) 写入文件，editFile({ path, old_string, new_string, replace_all }) 做原文替换，shell({ command }) 执行命令并返回 { stdout, stderr, exitCode, timedOut }，glob({ pattern, ignore }) 返回匹配路径数组（ignore 为要排除的模式列表）。程序会先经过语法与类型验证，验证失败会返回具体错误。程序完成后返回标准输出、返回值、程序内工具调用记录与错误信息。",
         parameters: {
             type: "object",
             properties: {

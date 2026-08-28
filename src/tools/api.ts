@@ -10,11 +10,16 @@ export interface ToolCallRecord {
 }
 
 export interface AgentApi {
-    readFile: (path: string) => Promise<string>;
-    writeFile: (path: string, content: string) => Promise<void>;
-    editFile: (path: string, oldString: string, newString: string, replaceAll?: boolean) => Promise<void>;
-    shell: (command: string) => Promise<ShellOutcome>;
-    glob: (pattern: string, ignore?: string[]) => Promise<string[]>;
+    readFile: (args: { path: string }) => Promise<string>;
+    writeFile: (args: { path: string; content: string }) => Promise<void>;
+    editFile: (args: {
+        path: string;
+        old_string: string;
+        new_string: string;
+        replace_all?: boolean;
+    }) => Promise<void>;
+    shell: (args: { command: string }) => Promise<ShellOutcome>;
+    glob: (args: { pattern: string; ignore?: string[] }) => Promise<string[]>;
     calls: ToolCallRecord[];
 }
 
@@ -36,27 +41,27 @@ export function createAgentApi(cwd: string): AgentApi {
     const calls: ToolCallRecord[] = [];
     return {
         calls,
-        async readFile(filePath) {
-            const content = await readFileText(filePath, cwd);
-            calls.push({ name: "readFile", summary: `读取 ${filePath}，共 ${content.length} 字符` });
+        async readFile(args) {
+            const content = await readFileText(args.path, cwd);
+            calls.push({ name: "readFile", summary: `读取 ${args.path}，共 ${content.length} 字符` });
             return content;
         },
-        async writeFile(filePath, content) {
-            await writeFileText(filePath, content, cwd);
-            calls.push({ name: "writeFile", summary: `写入 ${filePath}，共 ${content.length} 字符` });
+        async writeFile(args) {
+            await writeFileText(args.path, args.content, cwd);
+            calls.push({ name: "writeFile", summary: `写入 ${args.path}，共 ${args.content.length} 字符` });
         },
-        async editFile(filePath, oldString, newString, replaceAll) {
-            await editFileText(filePath, oldString, newString, cwd, replaceAll);
-            calls.push({ name: "editFile", summary: `编辑 ${filePath}` });
+        async editFile(args) {
+            await editFileText(args.path, args.old_string, args.new_string, cwd, args.replace_all);
+            calls.push({ name: "editFile", summary: `编辑 ${args.path}` });
         },
-        async shell(command) {
-            const outcome = await runShellCommand(command, cwd);
+        async shell(args) {
+            const outcome = await runShellCommand(args.command, cwd);
             calls.push({ name: "shell", summary: `执行命令，退出码 ${outcome.exitCode}` });
             return outcome;
         },
-        async glob(pattern, ignore) {
-            const matches = await matchGlob(pattern, cwd, ignore);
-            calls.push({ name: "glob", summary: `匹配 ${pattern}，共 ${matches.length} 个路径` });
+        async glob(args) {
+            const matches = await matchGlob(args.pattern, cwd, args.ignore);
+            calls.push({ name: "glob", summary: `匹配 ${args.pattern}，共 ${matches.length} 个路径` });
             return matches;
         },
     };
