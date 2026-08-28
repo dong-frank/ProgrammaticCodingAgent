@@ -23,7 +23,7 @@ export async function readFileText(filePath: string, cwd: string): Promise<strin
 
 export function readFileTool(): ToolDefinition {
     return {
-        name: "read_file",
+        name: "readFile",
         description: READ_FILE_DESCRIPTION,
         parameters: {
             type: "object",
@@ -36,7 +36,7 @@ export function readFileTool(): ToolDefinition {
         async execute(args, ctx) {
             const filePath = args.path;
             if (typeof filePath !== "string" || filePath.length === 0) {
-                throw new Error("read_file 参数 path 必须是非空字符串");
+                throw new Error("readFile 参数 path 必须是非空字符串");
             }
             try {
                 const content = await readFileText(filePath, ctx.cwd);

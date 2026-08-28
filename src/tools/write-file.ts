@@ -17,7 +17,7 @@ export async function writeFileText(filePath: string, content: string, cwd: stri
 
 export function writeFileTool(): ToolDefinition {
     return {
-        name: "write_file",
+        name: "writeFile",
         description: WRITE_FILE_DESCRIPTION,
         parameters: {
             type: "object",
@@ -32,10 +32,10 @@ export function writeFileTool(): ToolDefinition {
             const filePath = args.path;
             const content = args.content;
             if (typeof filePath !== "string" || filePath.length === 0) {
-                throw new Error("write_file 参数 path 必须是非空字符串");
+                throw new Error("writeFile 参数 path 必须是非空字符串");
             }
             if (typeof content !== "string") {
-                throw new Error("write_file 参数 content 必须是字符串");
+                throw new Error("writeFile 参数 content 必须是字符串");
             }
             try {
                 await writeFileText(filePath, content, ctx.cwd);

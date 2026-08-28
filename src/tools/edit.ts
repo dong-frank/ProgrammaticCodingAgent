@@ -36,7 +36,7 @@ export async function editFileText(
 
 export function editTool(): ToolDefinition {
     return {
-        name: "edit",
+        name: "editFile",
         description: EDIT_DESCRIPTION,
         parameters: {
             type: "object",
