@@ -70,7 +70,6 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
             error: `程序验证失败：\n${messages.join("\n")}`,
             stdout: "",
             returnValue: "undefined",
-            toolCalls: [],
         };
     }
 
@@ -79,7 +78,7 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
         js = transpileAgentProgram(code);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return { timedOut: false, error: message, stdout: "", returnValue: "undefined", toolCalls: [] };
+        return { timedOut: false, error: message, stdout: "", returnValue: "undefined" };
     }
 
     const api = createAgentApi(cwd);
@@ -110,7 +109,6 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
                 error: `程序同步执行超时（${SYNC_TIMEOUT_MS} 毫秒）`,
                 stdout: stdoutLines.join("\n"),
                 returnValue: "undefined",
-                toolCalls: api.calls,
             };
         }
         const message = error instanceof Error ? error.message : String(error);
@@ -119,7 +117,6 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
             error: message,
             stdout: stdoutLines.join("\n"),
             returnValue: "undefined",
-            toolCalls: api.calls,
         };
     }
 
@@ -147,5 +144,5 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
         stdout = `${stdout.slice(0, MAX_STDOUT_CHARS)}\n[输出已截断]`;
     }
 
-    return { timedOut, error, stdout, returnValue, toolCalls: api.calls };
+    return { timedOut, error, stdout, returnValue };
 }

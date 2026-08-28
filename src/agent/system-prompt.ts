@@ -21,7 +21,7 @@ export function buildCodeSystemPrompt(workspace: string, toolNames: string[]): s
         renderAgentApiUsageGuide(),
         "程序内不要使用 import 语句，直接调用上述函数，支持 await 与顶层 await。",
         "程序会先经过语法与类型验证，验证失败会返回带行号的具体错误，请据此修复程序后重新提交。",
-        "程序执行后你会收到标准输出、返回值、程序内工具调用记录与错误信息，根据结果决定继续修改程序还是完成任务。",
+        "程序执行后只回传标准输出与返回值，请在程序内用 console.log 输出需要确认的关键信息（如读取到的内容、处理进展与结果），根据这些输出决定继续修改程序还是完成任务。",
         "任务完成后，用简洁的中文总结你做了什么。",
     ].join("\n");
 }
