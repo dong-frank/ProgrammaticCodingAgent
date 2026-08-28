@@ -283,12 +283,15 @@ export function App(props: AppProps): React.ReactElement {
             <Text color="cyan" bold>
                 programmatic-coding-agent v0.1.0
             </Text>
-            <Text color="gray">
-                模式 {mode} ｜ 会话 {recordId} ｜ 模型 {client.getModelName()} ｜ 工作目录 {workspace}
-            </Text>
             <Static items={messages}>{renderMessage}</Static>
-            <Text>{running ? "运行中，任务将排队…" : `输入任务，/help 查看命令`}</Text>
-            <Text color={running ? "yellow" : undefined}>{`${mode}> `}<TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus /></Text>
+            <Box borderStyle="round" borderColor="cyan" paddingX={1}>
+                <Box flexDirection="column" width="100%">
+                    <Text color={running ? "yellow" : undefined}>{`${mode}> `}<TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus /></Text>
+                    <Text color="gray">
+                        模式 {mode} ｜ 会话 {recordId} ｜ 模型 {client.getModelName()} ｜ 工作目录 {workspace}
+                    </Text>
+                </Box>
+            </Box>
         </Box>
     );
 }
