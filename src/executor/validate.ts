@@ -2,14 +2,15 @@ import ts from "typescript";
 import { renderAgentApiDeclarations } from "../tools/api-schema.ts";
 import type { ValidationIssue } from "./types.ts";
 
-// 声明文本由 API schema 模块生成，程序源码紧随其后，诊断行号需减去此前缀行数
+// 声明文本由 API schema 模块生成；程序源码在声明之后、函数体包装之内，诊断行号需减去此前缀行数
 const DECLARATIONS = renderAgentApiDeclarations();
-const DECLARATION_OFFSET = DECLARATIONS.split("\n").length + 2;
+const FUNCTION_OPEN = "export async function __agent_main__(): Promise<unknown> {";
+const DECLARATION_OFFSET = DECLARATIONS.split("\n").length + 3;
 
 export function validateAgentProgram(code: string): ValidationIssue[] {
     const fileName = "agent-program.ts";
-    // export {} 使文件成为模块，允许程序使用顶层 await（与运行时行为一致）
-    const content = `${DECLARATIONS}\n\n${code}\n\nexport {};`;
+    // 与执行层一致：代码包进 async 函数体检查，因此支持顶层 await 与顶层 return
+    const content = `${DECLARATIONS}\n\n${FUNCTION_OPEN}\n${code}\n}`;
 
     const options: ts.CompilerOptions = {
         target: ts.ScriptTarget.ES2023,
