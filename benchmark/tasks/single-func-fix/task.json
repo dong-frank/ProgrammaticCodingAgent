@@ -1,0 +1,11 @@
+{
+  "id": "single-func-fix",
+  "name": "单函数修复",
+  "description": "修复 src/math.js 中的 add 函数：它应接收两个数字参数并返回它们的和。修改 src/math.js 即可。",
+  "files": {
+    "src/math.js": "export function add(a, b) {\n    return a - b; // 错误的实现\n}\n"
+  },
+  "verifyCommand": "node {{verify}} {{workspace}}",
+  "timeoutMs": 180000,
+  "maxRounds": 15
+}

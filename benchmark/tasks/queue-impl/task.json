@@ -1,0 +1,11 @@
+{
+  "id": "queue-impl",
+  "name": "队列实现",
+  "description": "src/queue.js 中的队列实现有缺陷。实现先进先出队列：enqueue(value) 入队，dequeue() 出队并返回队首元素（空队列返回 undefined），peek() 查看队首但不删除，size 属性返回当前元素数量。修改 src/queue.js 即可。",
+  "files": {
+    "src/queue.js": "export class Queue {\n    #items = [];\n    get size() {\n        return this.#items.length;\n    }\n    enqueue(value) {\n        this.#items.push(value);\n    }\n    dequeue() {\n        return this.#items.pop(); // 错误的实现：后进先出\n    }\n    peek() {\n        return this.#items[this.#items.length - 1]; // 错误的实现：查看的是队尾\n    }\n}\n"
+  },
+  "verifyCommand": "node {{verify}} {{workspace}}",
+  "timeoutMs": 180000,
+  "maxRounds": 15
+}
