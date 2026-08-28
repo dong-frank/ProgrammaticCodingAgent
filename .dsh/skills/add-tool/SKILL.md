@@ -1,3 +1,8 @@
+---
+name: add-tool
+description: 为编程智能体新增能力时使用。要求新能力同时提供 Tool Calling 工具形式与 Code Mode 注入 API 形式，共用同一底层实现。当需要增加文件读写、命令执行、路径匹配之外的技能，或询问如何添加工具/扩展 agent 能力时，遵循本 skill。
+---
+
 # 新增工具指南（Tool + API 双形式）
 
 ## 适用范围
