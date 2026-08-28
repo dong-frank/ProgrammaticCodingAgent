@@ -2,6 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ToolDefinition } from "./types.ts";
 
+export const WRITE_FILE_DESCRIPTION = "创建或覆盖写入指定文件，自动创建不存在的父目录。";
+
 export async function writeFileText(filePath: string, content: string, cwd: string): Promise<void> {
     const absolutePath = path.resolve(cwd, filePath);
     try {
@@ -16,7 +18,7 @@ export async function writeFileText(filePath: string, content: string, cwd: stri
 export function writeFileTool(): ToolDefinition {
     return {
         name: "write_file",
-        description: "创建或覆盖写入指定文件，自动创建不存在的父目录。",
+        description: WRITE_FILE_DESCRIPTION,
         parameters: {
             type: "object",
             properties: {

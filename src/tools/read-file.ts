@@ -4,6 +4,8 @@ import type { ToolDefinition } from "./types.ts";
 
 export const MAX_READ_CHARS = 200_000;
 
+export const READ_FILE_DESCRIPTION = "读取指定文件的文本内容。路径相对工作目录或为绝对路径。";
+
 export async function readFileText(filePath: string, cwd: string): Promise<string> {
     const absolutePath = path.resolve(cwd, filePath);
     let content: string;
@@ -22,7 +24,7 @@ export async function readFileText(filePath: string, cwd: string): Promise<strin
 export function readFileTool(): ToolDefinition {
     return {
         name: "read_file",
-        description: "读取指定文件的文本内容。路径相对工作目录或为绝对路径。",
+        description: READ_FILE_DESCRIPTION,
         parameters: {
             type: "object",
             properties: {

@@ -16,6 +16,19 @@ export interface AgentApi {
     calls: ToolCallRecord[];
 }
 
+export interface AgentApiMeta {
+    name: keyof Omit<AgentApi, "calls">;
+    returnType: string;
+}
+
+// 与 AgentApi 接口同文件维护：返回类型文本与类型定义相邻，新增 API 时同步补充
+export const AGENT_API_META: readonly AgentApiMeta[] = [
+    { name: "readFile", returnType: "Promise<string>" },
+    { name: "writeFile", returnType: "Promise<void>" },
+    { name: "shell", returnType: "Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean }>" },
+    { name: "glob", returnType: "Promise<string[]>" },
+];
+
 export function createAgentApi(cwd: string): AgentApi {
     const calls: ToolCallRecord[] = [];
     return {

@@ -1,44 +1,44 @@
-export interface AgentApiSchema {
-    name: string;
-    signature: string;
-    description: string;
-}
+import { AGENT_API_META } from "./api.ts";
+import { readFileTool } from "./read-file.ts";
+import { writeFileTool } from "./write-file.ts";
+import { shellTool } from "./shell.ts";
+import { globTool } from "./glob.ts";
+import { formatParameterList } from "./tool-schema.ts";
+import type { ToolDefinition } from "./types.ts";
 
-export const AGENT_API_SCHEMAS: readonly AgentApiSchema[] = [
-    {
-        name: "readFile",
-        signature: "readFile(path: string): Promise<string>",
-        description: "读取文本文件内容，路径相对工作目录或为绝对路径",
-    },
-    {
-        name: "writeFile",
-        signature: "writeFile(path: string, content: string): Promise<void>",
-        description: "创建或覆盖写入文件，自动创建不存在的父目录",
-    },
-    {
-        name: "shell",
-        signature:
-            "shell(command: string): Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean }>",
-        description: "执行 shell 命令，返回标准输出、标准错误、退出码与是否超时",
-    },
-    {
-        name: "glob",
-        signature: "glob(pattern: string, ignore?: string[]): Promise<string[]>",
-        description: "按通配符模式匹配路径，ignore 为要排除的模式列表，例如 [\"**/node_modules/**\", \"**/.git/**\"]",
-    },
-];
+// API 与底层工具模块的对应关系：schema 的每个部分都取自定义链路上
+// 名称与返回类型来自 api.ts 的 AGENT_API_META，参数与描述来自工具模块（与 Tool 模式共用）
+const API_TOOLS: Record<string, ToolDefinition> = {
+    readFile: readFileTool(),
+    writeFile: writeFileTool(),
+    shell: shellTool(),
+    glob: globTool(),
+};
 
 export const CONSOLE_DECLARATION =
     "declare const console: {\n    log(...args: unknown[]): void;\n    error(...args: unknown[]): void;\n    warn(...args: unknown[]): void;\n};";
 
+function entries(): Array<{ name: string; returnType: string; tool: ToolDefinition }> {
+    return AGENT_API_META.map((meta) => ({
+        name: meta.name,
+        returnType: meta.returnType,
+        tool: API_TOOLS[meta.name] ?? (() => {
+            throw new Error(`缺少 API ${meta.name} 对应的工具模块定义`);
+        })(),
+    }));
+}
+
 export function renderAgentApiDeclarations(): string {
-    const functions = AGENT_API_SCHEMAS.map((schema) => `declare function ${schema.signature};`).join("\n");
+    const functions = entries()
+        .map((entry) => `declare function ${entry.name}(${formatParameterList(entry.tool)}): ${entry.returnType};`)
+        .join("\n");
     return `${functions}\n${CONSOLE_DECLARATION}`;
 }
 
 export function renderAgentApiUsageGuide(): string {
-    const lines = AGENT_API_SCHEMAS.map(
-        (schema) => `- ${schema.signature} —— ${schema.description}`,
+    const lines = entries().map(
+        (entry) =>
+            `- ${entry.name}(${formatParameterList(entry.tool)}): ${entry.returnType} —— ${entry.tool.description}`,
     );
     return ["程序内可直接使用以下全局函数（无需 import，支持 await）：", ...lines].join("\n");
 }

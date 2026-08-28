@@ -4,6 +4,9 @@ import type { ToolDefinition } from "./types.ts";
 export const SHELL_TIMEOUT_MS = 60_000;
 export const MAX_OUTPUT_CHARS = 20_000;
 
+export const SHELL_DESCRIPTION =
+    "在 shell 中执行命令并返回标准输出、标准错误与退出码。命令在指定工作目录中运行。";
+
 export interface ShellOutcome {
     stdout: string;
     stderr: string;
@@ -45,7 +48,7 @@ export function runShellCommand(command: string, cwd: string): Promise<ShellOutc
 export function shellTool(): ToolDefinition {
     return {
         name: "shell",
-        description: "在 shell 中执行命令并返回标准输出、标准错误与退出码。命令在指定工作目录中运行。",
+        description: SHELL_DESCRIPTION,
         parameters: {
             type: "object",
             properties: {

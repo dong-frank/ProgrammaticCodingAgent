@@ -1,6 +1,9 @@
 import fg from "fast-glob";
 import type { ToolDefinition } from "./types.ts";
 
+export const GLOB_DESCRIPTION =
+    "按通配符模式匹配工作目录下的文件路径，返回匹配到的路径列表。如需排除某些目录（如 node_modules、.git），通过 ignore 参数传入要排除的模式列表。";
+
 export async function matchGlob(pattern: string, cwd: string, ignore?: string[]): Promise<string[]> {
     let matches: string[];
     try {
@@ -16,8 +19,7 @@ export async function matchGlob(pattern: string, cwd: string, ignore?: string[])
 export function globTool(): ToolDefinition {
     return {
         name: "glob",
-        description:
-            "按通配符模式匹配工作目录下的文件路径，返回匹配到的路径列表。如需排除某些目录（如 node_modules、.git），通过 ignore 参数传入要排除的模式列表。",
+        description: GLOB_DESCRIPTION,
         parameters: {
             type: "object",
             properties: {
