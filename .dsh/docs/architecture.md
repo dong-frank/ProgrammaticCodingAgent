@@ -87,8 +87,7 @@ Code Mode 从模型响应中提取 Agent Program，整体交给 Code Executor，
 
 ### Code Executor
 
-- 代码提取：从模型全文提取代码块
-- 前置校验：代码块语言标记、基础语法检查
+- 静态验证：对 Agent Program 执行语法与类型诊断（TypeScript 编译器），拦截类型错误与未注入全局的引用，在执行前将具体错误（含行号）回填模型
 - API 注入：向程序运行环境注入统一工具接口
 - 执行：运行 Agent Program
 - 输出捕获：标准输出、标准错误、注入 API 的调用记录
@@ -217,26 +216,32 @@ programmatic-coding-agent/
 │   │   ├── tool-mode.ts
 │   │   └── code-mode.ts
 │   ├── executor/
-│   │   ├── code-extractor.ts
-│   │   ├── code-executor.ts
-│   │   └── execution-result.ts
+│   │   ├── types.ts
+│   │   ├── validate.ts
+│   │   └── code-executor.ts
 │   ├── tools/
 │   │   ├── tool-registry.ts
 │   │   ├── tool-bridge.ts
 │   │   ├── read-file.ts
 │   │   ├── write-file.ts
 │   │   ├── shell.ts
-│   │   └── glob.ts
+│   │   ├── glob.ts
+│   │   ├── api.ts
+│   │   └── exec-code.ts
 │   ├── llm/
 │   │   ├── client.ts
+│   │   └── types.ts
+│   ├── session/
+│   │   ├── store.ts
 │   │   └── types.ts
 │   └── benchmark/
 │       ├── task.ts
 │       ├── runner.ts
-│       ├── metrics.ts
 │       └── report.ts
 ├── benchmark/
-│   └── tasks/
+│   ├── tasks/
+│   │   └── <任务 id>/（task.json 与 verify.mjs）
+│   └── results/
 ├── docs/
 │   └── architecture.md
 ├── package.json
