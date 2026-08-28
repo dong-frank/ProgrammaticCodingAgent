@@ -51,7 +51,7 @@ export function globTool(): ToolDefinition {
                 return { content: matches.join("\n") };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                return { content: message };
+                return { content: message, error: true };
             }
         },
     };

@@ -25,10 +25,12 @@ export interface RunAgentParams {
 export interface AgentMetrics {
     llmCalls: number;
     toolCalls: number;
+    errorRecoveryEvents: number;
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
     durationMs: number;
+    apiDurationMs: number;
 }
 
 export interface AgentResult {
@@ -52,10 +54,12 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
 
     let llmCalls = 0;
     let toolCalls = 0;
+    let errorRecoveryEvents = 0;
     let promptTokens = 0;
     let completionTokens = 0;
     let totalTokens = 0;
     const startedAt = Date.now();
+    const apiBaseline = params.client.getApiDurationMs();
 
     for (let round = 1; round <= params.maxRounds; round += 1) {
         params.observer?.onRoundStart?.(round, params.maxRounds);
@@ -82,22 +86,31 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
                 metrics: {
                     llmCalls,
                     toolCalls,
+                    errorRecoveryEvents,
                     promptTokens,
                     completionTokens,
                     totalTokens,
                     durationMs: Date.now() - startedAt,
+                    apiDurationMs: params.client.getApiDurationMs() - apiBaseline,
                 },
             };
         }
 
+        let roundHadError = false;
         for (const call of calls) {
             params.observer?.onToolCall?.(call.function.name, call.function.arguments);
             const result = await executeTool(config.registry, call.function.name, call.function.arguments, {
                 cwd: params.workspace,
             });
+            if (result.error === true) {
+                roundHadError = true;
+            }
             params.observer?.onToolResult?.(result.content);
             context.append({ role: "tool", tool_call_id: call.id, content: result.content });
             toolCalls += 1;
+        }
+        if (roundHadError) {
+            errorRecoveryEvents += 1;
         }
     }
 
@@ -107,10 +120,12 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
         metrics: {
             llmCalls,
             toolCalls,
+            errorRecoveryEvents,
             promptTokens,
             completionTokens,
             totalTokens,
             durationMs: Date.now() - startedAt,
+            apiDurationMs: params.client.getApiDurationMs() - apiBaseline,
         },
     };
 }

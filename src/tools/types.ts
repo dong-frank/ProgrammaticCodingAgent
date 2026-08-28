@@ -4,6 +4,7 @@ export interface ToolContext {
 
 export interface ToolResult {
     content: string;
+    error?: boolean;
 }
 
 export interface ToolDefinition {

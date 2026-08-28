@@ -191,7 +191,10 @@ export function execCodeTool(): ToolDefinition {
             if (outcome.error !== null) {
                 lines.push(`错误信息：\n${outcome.error}`);
             }
-            return { content: lines.join("\n") };
+            return {
+                content: lines.join("\n"),
+                error: outcome.timedOut || outcome.error !== null ? true : undefined,
+            };
         },
     };
 }

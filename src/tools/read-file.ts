@@ -41,7 +41,7 @@ export function readFileTool(): ToolDefinition {
                 return { content };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
-                return { content: message };
+                return { content: message, error: true };
             }
         },
     };

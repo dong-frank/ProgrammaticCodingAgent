@@ -17,6 +17,7 @@ const REQUEST_TIMEOUT_MS = 300_000;
 export class LlmClient {
     private readonly client: OpenAI;
     private readonly model: string;
+    private apiDurationMs = 0;
 
     constructor(options: LlmClientOptions) {
         this.model = options.model;
@@ -32,7 +33,12 @@ export class LlmClient {
         return this.model;
     }
 
+    getApiDurationMs(): number {
+        return this.apiDurationMs;
+    }
+
     async chat(request: ChatRequest): Promise<ChatResult> {
+        const startedAt = Date.now();
         let completion: OpenAI.Chat.Completions.ChatCompletion;
         try {
             completion = await this.client.chat.completions.create({
@@ -46,6 +52,8 @@ export class LlmClient {
                 throw new Error(`模型接口返回 ${error.status}: ${error.message}`);
             }
             throw error;
+        } finally {
+            this.apiDurationMs += Date.now() - startedAt;
         }
 
         const choice = completion.choices[0];

@@ -81,7 +81,7 @@ export function shellTool(): ToolDefinition {
             if (stderr.length > 0) {
                 lines.push(`标准错误：\n${stderr}`);
             }
-            return { content: lines.join("\n") };
+            return { content: lines.join("\n"), error: outcome.timedOut ? true : undefined };
         },
     };
 }

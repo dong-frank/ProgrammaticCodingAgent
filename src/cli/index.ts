@@ -18,6 +18,9 @@ import {
     maxRoundsReached,
     errorText,
 } from "./ui.ts";
+import { loadTasks } from "../benchmark/task.ts";
+import { runTask, type BenchmarkRunResult } from "../benchmark/runner.ts";
+import { summarize, saveResults } from "../benchmark/report.ts";
 
 interface CliOptions {
     mode: string;
@@ -292,11 +295,47 @@ program
 program
     .command("benchmark")
     .description("运行 Tool Calling 与 Code Mode 对照实验")
-    .option("--mode <mode>", "只运行指定模式", "tool")
-    .option("--task <task>", "指定任务")
-    .action(() => {
-        console.error(errorText("对照实验尚未实现"));
-        process.exit(1);
-    });
+    .option("--mode <mode>", "只运行指定模式：tool、code 或 all", "all")
+    .option("--task <task>", "只运行指定任务 id")
+    .option("--max-rounds <rounds>", "覆盖任务定义的轮次上限")
+    .option("--model <model>", "模型名称（覆盖环境变量 PCA_MODEL）")
+    .action(
+        async (options: { mode: string; task?: string; maxRounds?: string; model?: string }) => {
+            try {
+                if (options.mode !== "all" && !isMode(options.mode)) {
+                    throw new Error(`无效模式：${options.mode}，有效值为 all、tool 或 code`);
+                }
+                const modes: Mode[] = options.mode === "all" ? ["tool", "code"] : [options.mode as Mode];
+                const maxRoundsOverride =
+                    options.maxRounds === undefined ? undefined : parseMaxRounds(options.maxRounds);
+                const client = createLlmClientFromEnv(options.model === undefined ? {} : { model: options.model });
+
+                const tasks = await loadTasks();
+                const selected =
+                    options.task === undefined ? tasks : tasks.filter((task) => task.id === options.task);
+                if (selected.length === 0) {
+                    throw new Error(`找不到任务：${options.task}`);
+                }
+
+                const results: BenchmarkRunResult[] = [];
+                for (const task of selected) {
+                    for (const mode of modes) {
+                        process.stderr.write(`运行任务 ${task.id}（${mode}）...\n`);
+                        const result = await runTask(task, mode, { client, maxRoundsOverride });
+                        results.push(result);
+                        process.stderr.write(`  完成：${result.success ? "成功" : "失败"}\n`);
+                    }
+                }
+
+                console.log(summarize(results));
+                const file = await saveResults(results);
+                process.stderr.write(`结果已保存：${file}\n`);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                console.error(errorText(message));
+                process.exit(1);
+            }
+        },
+    );
 
 await program.parseAsync(process.argv);
