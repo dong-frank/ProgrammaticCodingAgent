@@ -1,0 +1,18 @@
+{
+  "id": "batch-file-transform",
+  "name": "批量文件转换",
+  "description": "src/data/ 下有 8 个文本文件，每行一个条目，格式为 名称,分数。为每个文件生成同名 .meta.json（例如 a.txt 生成 a.meta.json），内容为 {\"name\": 名称字符串, \"score\": 分数数字, \"passed\": 分数大于等于 60 时为 true，否则 false}。读取全部文件后批量生成，不要修改原文件。",
+  "files": {
+    "src/data/a.txt": "apple,85\n",
+    "src/data/b.txt": "banana,42\n",
+    "src/data/c.txt": "cherry,90\n",
+    "src/data/d.txt": "date,58\n",
+    "src/data/e.txt": "elderberry,73\n",
+    "src/data/f.txt": "fig,30\n",
+    "src/data/g.txt": "grape,100\n",
+    "src/data/h.txt": "honeydew,61\n"
+  },
+  "verifyCommand": "node {{verify}} {{workspace}}",
+  "timeoutMs": 240000,
+  "maxRounds": 15
+}
