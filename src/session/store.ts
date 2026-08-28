@@ -2,6 +2,22 @@ import { mkdir, readFile, readdir, writeFile, rename, rm } from "node:fs/promise
 import os from "node:os";
 import path from "node:path";
 import type { SessionRecord } from "./types.ts";
+import type { ChatMessage } from "../llm/types.ts";
+import type { Mode } from "../modes/types.ts";
+
+export async function saveSession(
+    store: SessionStore,
+    record: SessionRecord,
+    context: { getMessages(): ChatMessage[] },
+    params: { mode: Mode; model: string; workspace: string },
+): Promise<void> {
+    record.messages = context.getMessages();
+    record.mode = params.mode;
+    record.model = params.model;
+    record.workspace = params.workspace;
+    record.updatedAt = new Date().toISOString();
+    await store.save(record);
+}
 
 function sessionDir(): string {
     const configured = process.env.PCA_SESSION_DIR;

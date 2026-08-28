@@ -2,22 +2,14 @@
 
 import "dotenv/config";
 import { Command } from "commander";
-import { createInterface } from "node:readline/promises";
 import { isMode, MODES, type Mode } from "../modes/types.ts";
 import { createLlmClientFromEnv, type LlmClient } from "../llm/client.ts";
 import { runAgent, type AgentObserver, type AgentResult } from "../agent/agent-loop.ts";
 import { ContextManager } from "../agent/context-manager.ts";
-import { SessionStore } from "../session/store.ts";
+import { SessionStore, saveSession } from "../session/store.ts";
 import type { SessionRecord } from "../session/types.ts";
-import {
-    banner,
-    helpText,
-    sessionsList,
-    createAgentObserver,
-    taskDone,
-    maxRoundsReached,
-    errorText,
-} from "./ui.ts";
+import { createAgentObserver, errorText } from "./ui.ts";
+import { startInteractive } from "./tui/app.tsx";
 import { loadTasks } from "../benchmark/task.ts";
 import { runTask, prepareWorkspace, defaultWorkspaceRoot, type BenchmarkRunResult } from "../benchmark/runner.ts";
 import { summarize, saveResults } from "../benchmark/report.ts";
@@ -44,13 +36,6 @@ function parseMaxRounds(raw: string): number {
         throw new Error(`无效轮次上限：${raw}`);
     }
     return maxRounds;
-}
-
-function formatDuration(ms: number): string {
-    if (ms < 1000) {
-        return `${ms} 毫秒`;
-    }
-    return `${(ms / 1000).toFixed(1)} 秒`;
 }
 
 function createObserver(options: CliOptions): AgentObserver | undefined {
@@ -82,32 +67,6 @@ async function executeTask(
     });
 }
 
-async function saveSession(
-    store: SessionStore,
-    record: SessionRecord,
-    context: ContextManager,
-    params: { mode: Mode; model: string; workspace: string },
-): Promise<void> {
-    record.messages = context.getMessages();
-    record.mode = params.mode;
-    record.model = params.model;
-    record.workspace = params.workspace;
-    record.updatedAt = new Date().toISOString();
-    await store.save(record);
-}
-
-function renderResult(result: AgentResult, options: CliOptions): void {
-    const duration = formatDuration(result.metrics.durationMs);
-    if (result.stoppedReason === "completed") {
-        console.log(taskDone(result.finalMessage, result.metrics, duration));
-    } else {
-        console.log(maxRoundsReached(result.metrics, duration));
-    }
-    if (options.quiet !== true) {
-        process.stderr.write("\n");
-    }
-}
-
 async function runOnce(task: string, options: CliOptions): Promise<void> {
     const store = new SessionStore();
     const client = await createClient(options);
@@ -136,11 +95,6 @@ async function runOnce(task: string, options: CliOptions): Promise<void> {
 }
 
 async function runInteractive(options: CliOptions): Promise<void> {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.on("SIGINT", () => {
-        process.exit(0);
-    });
-
     const store = new SessionStore();
     const client = await createClient(options);
 
@@ -162,106 +116,15 @@ async function runInteractive(options: CliOptions): Promise<void> {
         context = new ContextManager();
     }
 
-    let mode = record.mode;
-    let workspace = record.workspace;
-
-    console.log(banner({ mode, model: client.getModelName(), workspace, sessionId: record.id }));
-    console.log("");
-
-    rl.setPrompt(`${mode}> `);
-    rl.prompt();
-    for await (const raw of rl) {
-        const line = raw.trim();
-        if (line.length > 0) {
-            if (line.startsWith("/")) {
-                const [command, ...rest] = line.split(/\s+/);
-                const arg = rest.join(" ");
-                switch (command) {
-                    case "/help":
-                        console.log(helpText(mode));
-                        break;
-                    case "/mode":
-                        if (arg.length === 0) {
-                            console.log(`当前模式：${mode}`);
-                        } else if (isMode(arg)) {
-                            mode = arg;
-                            record.mode = arg;
-                            console.log(`模式已切换为 ${mode}`);
-                        } else {
-                            console.error(errorText(`无效模式：${arg}，有效值为 ${MODES.join(" 或 ")}`));
-                        }
-                        break;
-                    case "/sessions": {
-                        const records = await store.list();
-                        console.log(
-                            sessionsList(
-                                records.map((item) => ({
-                                    id: item.id,
-                                    workspace: item.workspace,
-                                    mode: item.mode,
-                                    messageCount: item.messages.length,
-                                    updatedAt: new Date(item.updatedAt).toLocaleString(),
-                                    current: item.id === record.id,
-                                })),
-                            ),
-                        );
-                        break;
-                    }
-                    case "/session": {
-                        if (arg.length === 0) {
-                            console.error(errorText("用法：/session <id>"));
-                            break;
-                        }
-                        const loaded = await store.get(arg);
-                        if (loaded === null) {
-                            console.error(errorText(`会话 ${arg} 不存在，/sessions 查看已有会话`));
-                            break;
-                        }
-                        await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
-                        record = loaded;
-                        context = new ContextManager(record.messages);
-                        mode = record.mode;
-                        workspace = record.workspace;
-                        console.log(`已切换会话 ${record.id}（模式 ${mode}，工作目录 ${workspace}）`);
-                        break;
-                    }
-                    case "/new": {
-                        await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
-                        record = store.createRecord({
-                            workspace: options.workspace,
-                            mode: options.mode as Mode,
-                            model: client.getModelName(),
-                        });
-                        context = new ContextManager();
-                        mode = record.mode;
-                        workspace = record.workspace;
-                        console.log(`已开始新会话 ${record.id}`);
-                        break;
-                    }
-                    case "/quit":
-                    case "/exit":
-                        await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
-                        rl.close();
-                        return;
-                    default:
-                        console.error(errorText(`未知命令 ${command}，输入 /help 查看可用命令`));
-                        break;
-                }
-            } else {
-                try {
-                    const result = await executeTask(line, { ...options, mode, workspace }, context, client);
-                    renderResult(result, { ...options, mode, workspace });
-                } catch (error) {
-                    const message = error instanceof Error ? error.message : String(error);
-                    console.error(errorText(message));
-                }
-            }
-        }
-        rl.setPrompt(`${mode}> `);
-        rl.prompt();
-    }
-
-    await saveSession(store, record, context, { mode, model: client.getModelName(), workspace });
+    await startInteractive({
+        client,
+        store,
+        record,
+        context,
+        maxRounds: parseMaxRounds(options.maxRounds),
+        model: options.model,
+        workspace: options.workspace,
+    });
 }
 
 const program = new Command();

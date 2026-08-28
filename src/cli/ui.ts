@@ -1,6 +1,5 @@
 import pc from "picocolors";
 import type { AgentObserver } from "../agent/agent-loop.ts";
-import type { AgentMetrics } from "../agent/agent-loop.ts";
 
 const MAX_ARG_VALUE_CHARS = 60;
 const MAX_RESULT_CHARS = 1_000;
@@ -31,43 +30,6 @@ export function formatArgs(rawArguments: string): string {
     return parts.join(", ");
 }
 
-export function banner(params: { mode: string; model: string; workspace: string; sessionId?: string }): string {
-    const lines = [
-        pc.bold("programmatic-coding-agent") + pc.dim(` v0.1.0`),
-        `${pc.dim("模式")} ${params.mode}  ${pc.dim("模型")} ${params.model}`,
-        `${pc.dim("工作目录")} ${params.workspace}`,
-    ];
-    if (params.sessionId !== undefined) {
-        lines.push(`${pc.dim("会话")} ${params.sessionId}`);
-    }
-    lines.push(pc.dim("输入任务开始执行，/help 查看命令，Ctrl+C 退出"));
-    return lines.join("\n");
-}
-
-export interface SessionSummary {
-    id: string;
-    workspace: string;
-    mode: string;
-    messageCount: number;
-    updatedAt: string;
-    current: boolean;
-}
-
-export function sessionsList(records: SessionSummary[]): string {
-    if (records.length === 0) {
-        return "暂无已保存的会话";
-    }
-    const rows = records.map((record) => {
-        const marker = record.current ? pc.green(" *") : "";
-        return [
-            `${pc.cyan(record.id)}${marker}`,
-            pc.dim(`模式 ${record.mode} · 消息 ${record.messageCount} 条 · 更新于 ${record.updatedAt}`),
-            pc.dim(record.workspace),
-        ].join("\n");
-    });
-    return rows.join("\n\n");
-}
-
 export function roundHeader(round: number, maxRounds: number): string {
     return pc.bold(pc.cyan(`[轮次 ${round}/${maxRounds}]`));
 }
@@ -88,41 +50,8 @@ export function toolResult(content: string): string {
     return `${pc.dim("← 结果")}\n${pc.dim(text)}`;
 }
 
-export function taskDone(finalMessage: string, metrics: AgentMetrics, durationText: string): string {
-    const lines = [
-        pc.green(pc.bold("任务完成")),
-        finalMessage,
-        pc.dim(
-            `模型调用 ${metrics.llmCalls} 次 · 工具调用 ${metrics.toolCalls} 次 · token ${metrics.totalTokens} · 耗时 ${durationText}`,
-        ),
-    ];
-    return lines.join("\n");
-}
-
-export function maxRoundsReached(metrics: AgentMetrics, durationText: string): string {
-    return pc.yellow(
-        `达到最大轮次未能完成 · 模型调用 ${metrics.llmCalls} 次 · 工具调用 ${metrics.toolCalls} 次 · token ${metrics.totalTokens} · 耗时 ${durationText}`,
-    );
-}
-
 export function errorText(message: string): string {
     return pc.red(pc.bold(`运行失败：${message}`));
-}
-
-export function helpText(currentMode: string): string {
-    return [
-        pc.bold("可用命令"),
-        pc.cyan("/help") + pc.dim("          显示本帮助"),
-        pc.cyan("/sessions") + pc.dim("       列出已保存的会话"),
-        pc.cyan("/session <id>") + pc.dim("   切换并恢复指定会话"),
-        pc.cyan("/new") + pc.dim("           保存当前会话并开始新会话"),
-        pc.cyan("/mode") + pc.dim("          显示当前模式"),
-        pc.cyan("/mode tool") + pc.dim("    切换为 Tool Calling 模式"),
-        pc.cyan("/mode code") + pc.dim("    切换为 Code Mode"),
-        pc.cyan("/quit") + pc.dim("         退出（等价 /exit）"),
-        "",
-        pc.dim(`当前模式：${currentMode}`),
-    ].join("\n");
 }
 
 export function createAgentObserver(log: (text: string) => void): AgentObserver {

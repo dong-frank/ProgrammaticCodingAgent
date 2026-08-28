@@ -11,18 +11,23 @@
     "pca": "src/cli/index.ts"
   },
   "scripts": {
-    "start": "node src/cli/index.ts",
+    "start": "node --import tsx src/cli/index.ts",
     "typecheck": "tsc"
   },
   "dependencies": {
     "commander": "^13.1.0",
     "dotenv": "^17.4.2",
     "fast-glob": "^3.3.3",
+    "ink": "^7.1.1",
+    "ink-text-input": "^6.0.0",
     "openai": "^7.7.0",
     "picocolors": "^1.1.1",
+    "react": "^19.2.8",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0"
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.18"
   }
 }
