@@ -1,19 +1,9 @@
 import ts from "typescript";
+import { renderAgentApiDeclarations } from "../tools/api-schema.ts";
 import type { ValidationIssue } from "./types.ts";
 
-const DECLARATIONS = [
-    "declare function readFile(path: string): Promise<string>;",
-    "declare function writeFile(path: string, content: string): Promise<void>;",
-    "declare function shell(command: string): Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean }>;",
-    "declare function glob(pattern: string, ignore?: string[]): Promise<string[]>;",
-    "declare const console: {",
-    "    log(...args: unknown[]): void;",
-    "    error(...args: unknown[]): void;",
-    "    warn(...args: unknown[]): void;",
-    "};",
-].join("\n");
-
-// 程序源码紧跟在声明块与空行之后，诊断行号需减去此前缀行数
+// 声明文本由 API schema 模块生成，程序源码紧随其后，诊断行号需减去此前缀行数
+const DECLARATIONS = renderAgentApiDeclarations();
 const DECLARATION_OFFSET = DECLARATIONS.split("\n").length + 2;
 
 export function validateAgentProgram(code: string): ValidationIssue[] {
