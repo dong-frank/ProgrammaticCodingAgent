@@ -6,6 +6,6 @@ export function createToolModeConfig(): ModeConfig {
     const registry = createDefaultRegistry();
     return {
         registry,
-        systemPrompt: (workspace) => buildToolSystemPrompt(workspace, registry.listNames()),
+        systemPrompt: (workspace) => buildToolSystemPrompt(workspace, registry.list()),
     };
 }
