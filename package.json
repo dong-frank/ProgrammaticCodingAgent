@@ -8,7 +8,7 @@
     "node": ">=22.18.0"
   },
   "bin": {
-    "pca": "src/cli/index.ts"
+    "pca": "src/cli/bin.mjs"
   },
   "scripts": {
     "start": "node --import tsx src/cli/index.ts",

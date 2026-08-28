@@ -13,12 +13,21 @@
 npm install
 ```
 
+全局安装（可选）：在任意目录直接使用 `pca` 命令，不需要进入本项目目录：
+
+```bash
+npm link
+```
+
+全局安装后命令入口为 `src/cli/bin.mjs`（注册 tsx 加载器以运行交互界面的 JSX 组件），`--task`、`--workspace` 等参数相对当前工作目录生效；benchmark 任务定义与结果文件始终定位到本项目目录。
+
 ## 配置
 
-复制 `.env.example` 为 `.env`，填入接口地址、模型名称与 API key：
+配置按优先级读取：已导出的环境变量、当前目录 `.env`、用户级 `~/.config/pca/.env`。项目目录开发时复制 `.env.example` 为 `.env`；任意目录全局运行时，把配置写入 `~/.config/pca/.env`：
 
 ```bash
 cp .env.example .env
+mkdir -p ~/.config/pca && cp .env.example ~/.config/pca/.env
 ```
 
 | 环境变量 | 说明 |

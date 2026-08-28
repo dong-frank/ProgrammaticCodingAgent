@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import path from "node:path";
+import { projectRoot } from "../paths.ts";
 
 export interface BenchmarkTask {
     id: string;
@@ -23,7 +24,7 @@ interface TaskFileContents {
 }
 
 export async function loadTasks(tasksDir?: string): Promise<BenchmarkTask[]> {
-    const root = tasksDir ?? path.join(process.cwd(), "benchmark", "tasks");
+    const root = tasksDir ?? path.join(projectRoot(), "benchmark", "tasks");
     let entries: string[];
     try {
         entries = await readdir(root);

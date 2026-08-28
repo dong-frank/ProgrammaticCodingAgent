@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import pc from "picocolors";
+import { projectRoot } from "../paths.ts";
 import type { BenchmarkRunResult } from "./runner.ts";
 
 export function formatDuration(ms: number): string {
@@ -67,7 +68,7 @@ export function summarize(results: BenchmarkRunResult[]): string {
 }
 
 export async function saveResults(results: BenchmarkRunResult[], resultsDir?: string): Promise<string> {
-    const dir = resultsDir ?? path.join(process.cwd(), "benchmark", "results");
+    const dir = resultsDir ?? path.join(projectRoot(), "benchmark", "results");
     await mkdir(dir, { recursive: true });
     const file = path.join(dir, `benchmark-${new Date().toISOString().replaceAll(":", "-")}.json`);
     await writeFile(file, JSON.stringify(results, null, 2), "utf8");

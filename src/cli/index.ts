@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+import os from "node:os";
+import path from "node:path";
 import { Command } from "commander";
 import { isMode, MODES, type Mode } from "../modes/types.ts";
 import { createLlmClientFromEnv, type LlmClient } from "../llm/client.ts";
@@ -13,6 +15,10 @@ import { startInteractive } from "./tui/app.tsx";
 import { loadTasks } from "../benchmark/task.ts";
 import { runTask, prepareWorkspace, defaultWorkspaceRoot, type BenchmarkRunResult } from "../benchmark/runner.ts";
 import { summarize, saveResults } from "../benchmark/report.ts";
+
+// 配置加载优先级：已存在的环境变量 > 当前目录 .env > 用户级 ~/.config/pca/.env
+loadEnv();
+loadEnv({ path: path.join(os.homedir(), ".config", "pca", ".env") });
 
 interface CliOptions {
     mode: string;
