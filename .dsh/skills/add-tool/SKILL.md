@@ -21,10 +21,11 @@ src/tools/<name>.ts           底层实现（核心函数 + 工具定义）
   ├── Tool 形式 → src/tools/registry.ts 注册 → Tool 模式提示词（自动）
   └── API 形式  → src/tools/api.ts 的 AgentApi 与元数据
                   → src/tools/api-schema.ts 的映射
+                  → src/executor/code-executor.ts 的 vm 注入
                   → Code 模式提示词与验证层声明（自动）
 ```
 
-提示词与验证层的渲染均由 schema 模块自动生成，无需手改；只有实现、注册、API 接线三处需要手动改动。
+提示词与验证层的渲染均由 schema 模块自动生成，无需手改；手动改动共四处：实现、Tool 注册、API 接线、Code 执行器注入。
 
 ## 第一步：新建底层模块 src/tools/<name>.ts
 
@@ -102,6 +103,21 @@ const API_TOOLS: Record<string, ToolDefinition> = {
     ...
     myOp: myTool(),
 };
+```
+
+## 第四步：注入 Code 执行器
+
+`src/executor/code-executor.ts` 的 `vm.createContext` 注入列表中增加新函数（遗漏会导致程序内调用报 `xxx is not defined`）：
+
+```typescript
+const context = vm.createContext({
+    readFile: api.readFile,
+    writeFile: api.writeFile,
+    editFile: api.editFile,
+    shell: api.shell,
+    glob: api.glob,
+    ...,
+});
 ```
 
 ## 自动跟随（无需手改）

@@ -1,5 +1,6 @@
 import { readFileText } from "./read-file.ts";
 import { writeFileText } from "./write-file.ts";
+import { editFileText } from "./edit.ts";
 import { runShellCommand, type ShellOutcome } from "./shell.ts";
 import { matchGlob } from "./glob.ts";
 
@@ -11,6 +12,7 @@ export interface ToolCallRecord {
 export interface AgentApi {
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
+    editFile: (path: string, oldString: string, newString: string, replaceAll?: boolean) => Promise<void>;
     shell: (command: string) => Promise<ShellOutcome>;
     glob: (pattern: string, ignore?: string[]) => Promise<string[]>;
     calls: ToolCallRecord[];
@@ -25,6 +27,7 @@ export interface AgentApiMeta {
 export const AGENT_API_META: readonly AgentApiMeta[] = [
     { name: "readFile", returnType: "Promise<string>" },
     { name: "writeFile", returnType: "Promise<void>" },
+    { name: "editFile", returnType: "Promise<void>" },
     { name: "shell", returnType: "Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean }>" },
     { name: "glob", returnType: "Promise<string[]>" },
 ];
@@ -41,6 +44,10 @@ export function createAgentApi(cwd: string): AgentApi {
         async writeFile(filePath, content) {
             await writeFileText(filePath, content, cwd);
             calls.push({ name: "writeFile", summary: `写入 ${filePath}，共 ${content.length} 字符` });
+        },
+        async editFile(filePath, oldString, newString, replaceAll) {
+            await editFileText(filePath, oldString, newString, cwd, replaceAll);
+            calls.push({ name: "editFile", summary: `编辑 ${filePath}` });
         },
         async shell(command) {
             const outcome = await runShellCommand(command, cwd);

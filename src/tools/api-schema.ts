@@ -1,6 +1,7 @@
 import { AGENT_API_META } from "./api.ts";
 import { readFileTool } from "./read-file.ts";
 import { writeFileTool } from "./write-file.ts";
+import { editTool } from "./edit.ts";
 import { shellTool } from "./shell.ts";
 import { globTool } from "./glob.ts";
 import { formatParameterList } from "./tool-schema.ts";
@@ -11,6 +12,7 @@ import type { ToolDefinition } from "./types.ts";
 const API_TOOLS: Record<string, ToolDefinition> = {
     readFile: readFileTool(),
     writeFile: writeFileTool(),
+    editFile: editTool(),
     shell: shellTool(),
     glob: globTool(),
 };

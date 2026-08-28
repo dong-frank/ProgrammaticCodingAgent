@@ -4,6 +4,7 @@ import { readFileTool } from "./read-file.ts";
 import { writeFileTool } from "./write-file.ts";
 import { shellTool } from "./shell.ts";
 import { globTool } from "./glob.ts";
+import { editTool } from "./edit.ts";
 
 export class ToolRegistry {
     private readonly tools = new Map<string, ToolDefinition>();
@@ -49,6 +50,7 @@ export function createDefaultRegistry(): ToolRegistry {
     registry.register(writeFileTool());
     registry.register(shellTool());
     registry.register(globTool());
+    registry.register(editTool());
     return registry;
 }
 

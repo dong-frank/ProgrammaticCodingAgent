@@ -88,6 +88,7 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
     const context = vm.createContext({
         readFile: api.readFile,
         writeFile: api.writeFile,
+        editFile: api.editFile,
         shell: api.shell,
         glob: api.glob,
         console: {
