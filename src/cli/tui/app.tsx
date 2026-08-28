@@ -288,7 +288,7 @@ export function App(props: AppProps): React.ReactElement {
                 <Box flexDirection="column" width="100%">
                     <Text color={running ? "yellow" : undefined}>{`${mode}> `}<TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus /></Text>
                     <Text color="gray">
-                        模式 {mode} ｜ 会话 {recordId} ｜ 模型 {client.getModelName()} ｜ 工作目录 {workspace}
+                        会话 {recordId} ｜ 模型 {client.getModelName()} ｜ 工作目录 {workspace}
                     </Text>
                 </Box>
             </Box>
