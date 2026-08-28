@@ -19,7 +19,7 @@ import {
     errorText,
 } from "./ui.ts";
 import { loadTasks } from "../benchmark/task.ts";
-import { runTask, type BenchmarkRunResult } from "../benchmark/runner.ts";
+import { runTask, prepareWorkspace, defaultWorkspaceRoot, type BenchmarkRunResult } from "../benchmark/runner.ts";
 import { summarize, saveResults } from "../benchmark/report.ts";
 
 interface CliOptions {
@@ -299,8 +299,9 @@ program
     .option("--task <task>", "只运行指定任务 id")
     .option("--max-rounds <rounds>", "覆盖任务定义的轮次上限")
     .option("--model <model>", "模型名称（覆盖环境变量 PCA_MODEL）")
+    .option("--reset", "只重建任务初始工作区，不运行实验")
     .action(
-        async (options: { mode: string; task?: string; maxRounds?: string; model?: string }) => {
+        async (options: { mode: string; task?: string; maxRounds?: string; model?: string; reset?: boolean }) => {
             try {
                 if (options.mode !== "all" && !isMode(options.mode)) {
                     throw new Error(`无效模式：${options.mode}，有效值为 all、tool 或 code`);
@@ -315,6 +316,16 @@ program
                     options.task === undefined ? tasks : tasks.filter((task) => task.id === options.task);
                 if (selected.length === 0) {
                     throw new Error(`找不到任务：${options.task}`);
+                }
+
+                if (options.reset === true) {
+                    for (const task of selected) {
+                        for (const mode of modes) {
+                            const workspace = await prepareWorkspace(task, defaultWorkspaceRoot(), mode);
+                            process.stderr.write(`已恢复初始工作区 ${task.id}（${mode}）：${workspace}\n`);
+                        }
+                    }
+                    return;
                 }
 
                 const results: BenchmarkRunResult[] = [];

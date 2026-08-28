@@ -99,7 +99,14 @@ src/
 
 ## 对照实验
 
-`pca benchmark` 用于运行 Tool Calling 与 Code Mode 的对照实验（测量模型调用次数、工具调用次数、token、耗时、成功率），当前处于开发中。
+```bash
+pca benchmark                         # 全部任务 × 两种模式
+pca benchmark --task single-func-fix  # 只运行指定任务
+pca benchmark --mode tool             # 只运行指定模式（tool / code / all）
+pca benchmark --reset                 # 只重建任务初始工作区，不运行实验
+```
+
+任务定义位于 `benchmark/tasks/<任务 id>/`：`task.json` 提供任务描述与初始文件，`verify.mjs` 是独立验收脚本。每次运行自动重建隔离工作区（`.workspace/benchmark/`），保证两种模式从同一初始状态开始；运行后按任务对比两模式的模型调用、工具调用、错误恢复次数、token、端到端与模型 API 耗时，结果保存到 `benchmark/results/`。
 
 ## 架构文档
 

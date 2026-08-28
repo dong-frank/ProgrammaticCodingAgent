@@ -6,7 +6,7 @@ import { runAgent, type AgentObserver } from "../agent/agent-loop.ts";
 import { runShellCommand } from "../tools/shell.ts";
 import type { BenchmarkTask } from "./task.ts";
 
-function defaultWorkspaceRoot(): string {
+export function defaultWorkspaceRoot(): string {
     const configured = process.env.PCA_BENCHMARK_DIR;
     if (configured !== undefined && configured.length > 0) {
         return configured;
