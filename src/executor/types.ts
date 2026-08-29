@@ -1,7 +1,10 @@
+export type ExecutionStatus = "success" | "validation-error" | "runtime-error" | "command-error" | "timeout";
+
 export interface CodeExecutionOutcome {
-    timedOut: boolean;
+    status: ExecutionStatus;
     error: string | null;
     stdout: string;
+    stderr: string;
     returnValue: string;
 }
 

@@ -1,5 +1,6 @@
 export interface ToolContext {
     cwd: string;
+    restrictToWorkspace?: boolean;
 }
 
 export interface ToolResult {

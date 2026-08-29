@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { resolveWorkspacePath } from "../paths.ts";
 import type { ToolDefinition } from "./types.ts";
 
 export const MAX_READ_CHARS = 200_000;
 
 export const READ_FILE_DESCRIPTION = "读取指定文件的文本内容。路径相对工作目录或为绝对路径。";
 
-export async function readFileText(filePath: string, cwd: string): Promise<string> {
-    const absolutePath = path.resolve(cwd, filePath);
+export async function readFileText(filePath: string, cwd: string, restrictToWorkspace = true): Promise<string> {
+    const absolutePath = resolveWorkspacePath(filePath, cwd, restrictToWorkspace);
     let content: string;
     try {
         content = await readFile(absolutePath, "utf8");
@@ -39,7 +39,7 @@ export function readFileTool(): ToolDefinition {
                 throw new Error("readFile 参数 path 必须是非空字符串");
             }
             try {
-                const content = await readFileText(filePath, ctx.cwd);
+                const content = await readFileText(filePath, ctx.cwd, ctx.restrictToWorkspace);
                 return { content };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);

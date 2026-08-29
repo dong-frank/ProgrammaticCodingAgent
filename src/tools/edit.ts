@@ -18,11 +18,12 @@ export async function editFileText(
     newString: string,
     cwd: string,
     replaceAll = false,
+    restrictToWorkspace = true,
 ): Promise<void> {
     if (oldString.length === 0) {
         throw new Error("old_string 必须是非空字符串");
     }
-    const content = await readFileText(filePath, cwd);
+    const content = await readFileText(filePath, cwd, restrictToWorkspace);
     const occurrences = countOccurrences(content, oldString);
     if (occurrences === 0) {
         throw new Error(`在 ${filePath} 中未找到要替换的内容`);
@@ -31,7 +32,7 @@ export async function editFileText(
         throw new Error(`在 ${filePath} 中找到 ${occurrences} 处匹配，请提供更精确的 old_string 或设置 replace_all`);
     }
     const updated = replaceAll ? content.split(oldString).join(newString) : content.replace(oldString, newString);
-    await writeFileText(filePath, updated, cwd);
+    await writeFileText(filePath, updated, cwd, restrictToWorkspace);
 }
 
 export function editTool(): ToolDefinition {
@@ -64,7 +65,7 @@ export function editTool(): ToolDefinition {
                 throw new Error("edit 参数 replace_all 必须是布尔值");
             }
             try {
-                await editFileText(filePath, oldString, newString, ctx.cwd, replaceAll);
+                await editFileText(filePath, oldString, newString, ctx.cwd, replaceAll, ctx.restrictToWorkspace);
                 return { content: `文件已更新：${filePath}` };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);

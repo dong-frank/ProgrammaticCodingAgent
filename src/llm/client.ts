@@ -10,6 +10,7 @@ export interface LlmClientOptions {
 export interface ChatRequest {
     messages: ChatMessage[];
     tools?: ToolSchema[];
+    signal?: AbortSignal;
 }
 
 const REQUEST_TIMEOUT_MS = 300_000;
@@ -46,7 +47,7 @@ export class LlmClient {
                 messages: toSdkMessages(request.messages),
                 tools: request.tools,
                 tool_choice: request.tools === undefined || request.tools.length === 0 ? undefined : "auto",
-            });
+            }, { signal: request.signal });
         } catch (error) {
             if (error instanceof OpenAI.APIError) {
                 throw new Error(`模型接口返回 ${error.status}: ${error.message}`);

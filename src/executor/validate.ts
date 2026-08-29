@@ -19,6 +19,7 @@ export function validateAgentProgram(code: string): ValidationIssue[] {
         module: ts.ModuleKind.ESNext,
         lib: ["lib.es2023.d.ts"],
         strict: true,
+        useUnknownInCatchVariables: false,
         noEmit: true,
         skipLibCheck: true,
         types: [],

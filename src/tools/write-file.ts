@@ -1,11 +1,17 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { resolveWorkspacePath } from "../paths.ts";
 import type { ToolDefinition } from "./types.ts";
 
 export const WRITE_FILE_DESCRIPTION = "创建或覆盖写入指定文件，自动创建不存在的父目录。";
 
-export async function writeFileText(filePath: string, content: string, cwd: string): Promise<void> {
-    const absolutePath = path.resolve(cwd, filePath);
+export async function writeFileText(
+    filePath: string,
+    content: string,
+    cwd: string,
+    restrictToWorkspace = true,
+): Promise<void> {
+    const absolutePath = resolveWorkspacePath(filePath, cwd, restrictToWorkspace);
     try {
         await mkdir(path.dirname(absolutePath), { recursive: true });
         await writeFile(absolutePath, content, "utf8");
@@ -38,7 +44,7 @@ export function writeFileTool(): ToolDefinition {
                 throw new Error("writeFile 参数 content 必须是字符串");
             }
             try {
-                await writeFileText(filePath, content, ctx.cwd);
+                await writeFileText(filePath, content, ctx.cwd, ctx.restrictToWorkspace);
                 return { content: `文件写入完成：${filePath}` };
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);

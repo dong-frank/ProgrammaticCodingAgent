@@ -12,7 +12,8 @@
   },
   "scripts": {
     "start": "node --import tsx src/cli/index.ts",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --import tsx --test test/execution.test.ts"
   },
   "dependencies": {
     "commander": "^13.1.0",

@@ -4,13 +4,16 @@ export const MAX_HISTORY_MESSAGES = 200;
 
 export class ContextManager {
     private readonly messages: ChatMessage[];
+    private readonly transcript: ChatMessage[];
 
     constructor(initialMessages: ChatMessage[] = []) {
-        this.messages = [...initialMessages];
+        this.messages = initialMessages.map(cloneMessage);
+        this.transcript = initialMessages.map(cloneMessage);
     }
 
     append(message: ChatMessage): void {
-        this.messages.push(message);
+        this.messages.push(cloneMessage(message));
+        this.transcript.push(cloneMessage(message));
         if (this.messages.length > MAX_HISTORY_MESSAGES) {
             this.trim();
         }
@@ -20,13 +23,42 @@ export class ContextManager {
         const first = this.messages[0];
         if (first !== undefined && first.role === "system") {
             first.content = content;
+            const transcriptFirst = this.transcript[0];
+            if (transcriptFirst !== undefined && transcriptFirst.role === "system") {
+                transcriptFirst.content = content;
+            }
         } else {
-            this.messages.unshift({ role: "system", content });
+            const systemMessage = { role: "system" as const, content };
+            this.messages.unshift(cloneMessage(systemMessage));
+            this.transcript.unshift(cloneMessage(systemMessage));
         }
     }
 
     getMessages(): ChatMessage[] {
         return this.messages;
+    }
+
+    getTranscript(): ChatMessage[] {
+        return this.transcript;
+    }
+
+    compactLastToolInteraction(toolName: string, compactArguments: string, result: string): void {
+        for (let i = this.messages.length - 1; i >= 0; i -= 1) {
+            const message = this.messages[i];
+            if (message?.role !== "assistant" || message.tool_calls === undefined) {
+                continue;
+            }
+            const call = message.tool_calls.find((item) => item.function.name === toolName);
+            if (call === undefined) {
+                continue;
+            }
+            call.function.arguments = compactArguments;
+            const toolMessage = this.messages[i + 1];
+            if (toolMessage?.role === "tool") {
+                toolMessage.content = result;
+            }
+            return;
+        }
     }
 
     private trim(): void {
@@ -57,4 +89,14 @@ export class ContextManager {
             }
         }
     }
+}
+
+function cloneMessage(message: ChatMessage): ChatMessage {
+    return {
+        ...message,
+        tool_calls: message.tool_calls?.map((call) => ({
+            ...call,
+            function: { ...call.function },
+        })),
+    };
 }

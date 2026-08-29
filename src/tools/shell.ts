@@ -8,25 +8,26 @@ export const SHELL_DESCRIPTION =
     "在 shell 中执行命令并返回标准输出、标准错误与退出码。命令在指定工作目录中运行。";
 
 export interface ShellOutcome {
+    ok: boolean;
     stdout: string;
     stderr: string;
     exitCode: number;
     timedOut: boolean;
 }
 
-export function runShellCommand(command: string, cwd: string): Promise<ShellOutcome> {
+export function runShellCommand(command: string, cwd: string, timeoutMs = SHELL_TIMEOUT_MS): Promise<ShellOutcome> {
     return new Promise((resolve) => {
         exec(
             command,
             {
                 cwd,
-                timeout: SHELL_TIMEOUT_MS,
+                timeout: Math.max(1, Math.min(timeoutMs, SHELL_TIMEOUT_MS)),
                 maxBuffer: MAX_OUTPUT_CHARS * 2,
                 env: { ...process.env, LANG: "en_US.UTF-8" },
             },
             (error, stdout, stderr) => {
                 if (error === null) {
-                    resolve({ stdout, stderr, exitCode: 0, timedOut: false });
+                    resolve({ ok: true, stdout, stderr, exitCode: 0, timedOut: false });
                     return;
                 }
                 const err = error as Error & { code?: string | number; killed?: boolean };
@@ -39,7 +40,7 @@ export function runShellCommand(command: string, cwd: string): Promise<ShellOutc
                 } else {
                     exitCode = 1;
                 }
-                resolve({ stdout, stderr, exitCode, timedOut });
+                resolve({ ok: false, stdout, stderr, exitCode, timedOut });
             },
         );
     });
@@ -84,7 +85,7 @@ export function shellTool(): ToolDefinition {
             if (stderr.length > 0) {
                 lines.push(`标准错误：\n${stderr}`);
             }
-            return { content: lines.join("\n"), error: outcome.timedOut ? true : undefined };
+            return { content: lines.join("\n"), error: outcome.ok ? undefined : true };
         },
     };
 }

@@ -10,6 +10,19 @@ const MAX_STDOUT_CHARS = 20_000;
 
 class ExecutionTimeoutError extends Error {}
 
+function errorMessage(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+    if (typeof error === "object" && error !== null && "message" in error) {
+        const message = error.message;
+        if (typeof message === "string") {
+            return message;
+        }
+    }
+    return String(error);
+}
+
 async function waitWithTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout: Promise<never> = new Promise((_, reject) => {
@@ -60,15 +73,20 @@ export function formatValue(value: unknown): string {
     }
 }
 
-export async function executeAgentProgram(code: string, cwd: string): Promise<CodeExecutionOutcome> {
+export async function executeAgentProgram(
+    code: string,
+    cwd: string,
+    restrictToWorkspace = true,
+): Promise<CodeExecutionOutcome> {
     // 静态验证：语法与类型诊断，在执行前拦截错误代码
     const issues = validateAgentProgram(code);
     if (issues.length > 0) {
         const messages = issues.map((issue) => `第 ${issue.line} 行：${issue.message}`);
         return {
-            timedOut: false,
+            status: "validation-error",
             error: `程序验证失败：\n${messages.join("\n")}`,
             stdout: "",
+            stderr: "",
             returnValue: "undefined",
         };
     }
@@ -77,12 +95,17 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
     try {
         js = transpileAgentProgram(code);
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return { timedOut: false, error: message, stdout: "", returnValue: "undefined" };
+        return { status: "runtime-error", error: errorMessage(error), stdout: "", stderr: "", returnValue: "undefined" };
     }
 
-    const api = createAgentApi(cwd);
     const stdoutLines: string[] = [];
+    const stderrLines: string[] = [];
+    const commandErrors: string[] = [];
+    const api = createAgentApi(cwd, (outcome) => {
+        if (!outcome.ok) {
+            commandErrors.push(`Shell 命令退出码：${outcome.exitCode}`);
+        }
+    }, restrictToWorkspace);
 
     const context = vm.createContext({
         readFile: api.readFile,
@@ -92,8 +115,8 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
         glob: api.glob,
         console: {
             log: (...parts: unknown[]) => stdoutLines.push(parts.map(formatValue).join(" ")),
-            error: (...parts: unknown[]) => stdoutLines.push(`[console.error] ${parts.map(formatValue).join(" ")}`),
-            warn: (...parts: unknown[]) => stdoutLines.push(`[console.warn] ${parts.map(formatValue).join(" ")}`),
+            error: (...parts: unknown[]) => stderrLines.push(parts.map(formatValue).join(" ")),
+            warn: (...parts: unknown[]) => stderrLines.push(parts.map(formatValue).join(" ")),
         },
     });
 
@@ -105,22 +128,24 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
     } catch (error) {
         if (error instanceof Error && error.message.includes("Script execution timed out")) {
             return {
-                timedOut: true,
+                status: "timeout",
                 error: `程序同步执行超时（${SYNC_TIMEOUT_MS} 毫秒）`,
                 stdout: stdoutLines.join("\n"),
+                stderr: stderrLines.join("\n"),
                 returnValue: "undefined",
             };
         }
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         return {
-            timedOut: false,
+            status: "runtime-error",
             error: message,
             stdout: stdoutLines.join("\n"),
+            stderr: stderrLines.join("\n"),
             returnValue: "undefined",
         };
     }
 
-    let timedOut = false;
+    let status: CodeExecutionOutcome["status"] = "success";
     let error: string | null = null;
     let returnValue = "undefined";
     try {
@@ -132,10 +157,11 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
         returnValue = formatValue(value);
     } catch (caught) {
         if (caught instanceof ExecutionTimeoutError) {
-            timedOut = true;
+            status = "timeout";
             error = caught.message;
         } else {
-            error = caught instanceof Error ? caught.message : String(caught);
+            status = "runtime-error";
+            error = errorMessage(caught);
         }
     }
 
@@ -144,5 +170,14 @@ export async function executeAgentProgram(code: string, cwd: string): Promise<Co
         stdout = `${stdout.slice(0, MAX_STDOUT_CHARS)}\n[输出已截断]`;
     }
 
-    return { timedOut, error, stdout, returnValue };
+    let stderr = stderrLines.join("\n");
+    if (stderr.length > MAX_STDOUT_CHARS) {
+        stderr = `${stderr.slice(0, MAX_STDOUT_CHARS)}\n[错误输出已截断]`;
+    }
+    if (status === "success" && commandErrors.length > 0) {
+        status = "command-error";
+        error = commandErrors.join("\n");
+    }
+
+    return { status, error, stdout, stderr, returnValue };
 }

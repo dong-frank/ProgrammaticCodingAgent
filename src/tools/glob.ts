@@ -1,10 +1,17 @@
 import fg from "fast-glob";
+import { validateWorkspaceGlob } from "../paths.ts";
 import type { ToolDefinition } from "./types.ts";
 
 export const GLOB_DESCRIPTION =
     "按通配符模式匹配工作目录下的文件路径，返回匹配到的路径列表。如需排除某些目录（如 node_modules、.git），通过 ignore 参数传入要排除的模式列表。";
 
-export async function matchGlob(pattern: string, cwd: string, ignore?: string[]): Promise<string[]> {
+export async function matchGlob(
+    pattern: string,
+    cwd: string,
+    ignore?: string[],
+    restrictToWorkspace = true,
+): Promise<string[]> {
+    validateWorkspaceGlob(pattern, restrictToWorkspace);
     let matches: string[];
     try {
         matches = await fg(pattern, { cwd, onlyFiles: true, ignore });
@@ -46,7 +53,7 @@ export function globTool(): ToolDefinition {
                 ignore = args.ignore as string[];
             }
             try {
-                const matches = await matchGlob(pattern, ctx.cwd, ignore);
+                const matches = await matchGlob(pattern, ctx.cwd, ignore, ctx.restrictToWorkspace);
                 if (matches.length === 0) {
                     return { content: "没有匹配到任何文件" };
                 }

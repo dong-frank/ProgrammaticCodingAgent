@@ -27,26 +27,35 @@ export const AGENT_API_META: readonly AgentApiMeta[] = [
     { name: "readFile", returnType: "Promise<string>" },
     { name: "writeFile", returnType: "Promise<void>" },
     { name: "editFile", returnType: "Promise<void>" },
-    { name: "shell", returnType: "Promise<{ stdout: string; stderr: string; exitCode: number; timedOut: boolean }>" },
+    {
+        name: "shell",
+        returnType: "Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number; timedOut: boolean }>",
+    },
     { name: "glob", returnType: "Promise<string[]>" },
 ];
 
-export function createAgentApi(cwd: string): AgentApi {
+export function createAgentApi(
+    cwd: string,
+    onShellResult?: (outcome: ShellOutcome) => void,
+    restrictToWorkspace = true,
+): AgentApi {
     return {
         async readFile(args) {
-            return await readFileText(args.path, cwd);
+            return await readFileText(args.path, cwd, restrictToWorkspace);
         },
         async writeFile(args) {
-            await writeFileText(args.path, args.content, cwd);
+            await writeFileText(args.path, args.content, cwd, restrictToWorkspace);
         },
         async editFile(args) {
-            await editFileText(args.path, args.old_string, args.new_string, cwd, args.replace_all);
+            await editFileText(args.path, args.old_string, args.new_string, cwd, args.replace_all, restrictToWorkspace);
         },
         async shell(args) {
-            return await runShellCommand(args.command, cwd);
+            const outcome = await runShellCommand(args.command, cwd);
+            onShellResult?.(outcome);
+            return outcome;
         },
         async glob(args) {
-            return await matchGlob(args.pattern, cwd, args.ignore);
+            return await matchGlob(args.pattern, cwd, args.ignore, restrictToWorkspace);
         },
     };
 }
