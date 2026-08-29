@@ -4,7 +4,9 @@ import type { ValidationIssue } from "./types.ts";
 
 // 声明文本由 API schema 模块生成；程序源码在声明之后、函数体包装之内，诊断行号需减去此前缀行数
 const DECLARATIONS = renderAgentApiDeclarations();
-const FUNCTION_OPEN = "export async function __agent_main__(): Promise<unknown> {";
+// 不声明返回类型：由 TS 推断，无 return 时推断为 Promise<void>，有 return 值时推断为对应类型，
+// 二者都合法，避免显式 Promise<unknown> 触发"必须显式 return"的类型检查错误
+const FUNCTION_OPEN = "export async function __agent_main__() {";
 const DECLARATION_OFFSET = DECLARATIONS.split("\n").length + 3;
 
 export function validateAgentProgram(code: string): ValidationIssue[] {
