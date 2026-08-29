@@ -13,7 +13,7 @@ const workspace = process.cwd();
 
 test("Code Mode 允许 catch 变量直接用于日志输出", async () => {
     const outcome = await executeAgentProgram(
-        'try { await readFile({ path: "missing-file.txt" }); } catch (error) { console.log(error.message); }',
+        'try { await tools.readFile({ path: "missing-file.txt" }); } catch (error) { console.log(error.message); }',
         workspace,
     );
 
@@ -23,7 +23,7 @@ test("Code Mode 允许 catch 变量直接用于日志输出", async () => {
 
 test("Code Mode 报告 Shell 非零退出码", async () => {
     const outcome = await executeAgentProgram(
-        'const result = await shell({ command: "node -e \\\"process.exit(7)\\\"" }); console.log(result.ok, result.exitCode);',
+        'const result = await tools.shell({ command: "node -e \\\"process.exit(7)\\\"" }); console.log(result.ok, result.exitCode);',
         workspace,
     );
 
@@ -55,9 +55,16 @@ test("Code Mode 将运行时异常标记为 runtime-error", async () => {
     assert.equal(outcome.error, "runtime failure");
 });
 
+test("Code Mode 拒绝模块导入并返回明确诊断", async () => {
+    const outcome = await executeAgentProgram('const module = await import("./src/csv.js"); return module;', workspace);
+
+    assert.equal(outcome.status, "validation-error");
+    assert.match(outcome.error ?? "", /不支持动态 import/);
+});
+
 test("Code Mode 的 Glob 不允许访问工作目录父级", async () => {
     const outcome = await executeAgentProgram(
-        'const files = await glob({ pattern: "../**/*" }); console.log(files);',
+        'const files = await tools.glob({ pattern: "../**/*" }); console.log(files);',
         workspace,
     );
 
@@ -94,6 +101,19 @@ test("Code Mode 在同一任务中增量维护唯一程序", async () => {
 
     const read = await tool.execute({ action: "read", startLine: 1, endLine: 1 }, context);
     assert.match(read.content, /console\.log\('v2'\)/);
+});
+
+test("Agent Program 编辑失败时返回可恢复的工具错误", async () => {
+    const tool = execCodeTool(new CodeProgramSession());
+    const context = { cwd: workspace };
+    await tool.execute({ action: "create", code: "console.log('current');" }, context);
+    const result = await tool.execute(
+        { action: "edit", baseRevision: 1, edits: [{ old_string: "missing", new_string: "updated" }] },
+        context,
+    );
+
+    assert.equal(result.error, true);
+    assert.match(result.content, /请使用 read 查看当前 Agent Program/);
 });
 
 test("模型上下文压缩 Code Mode 源码，完整轨迹保留原始内容", () => {

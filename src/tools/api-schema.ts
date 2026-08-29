@@ -34,18 +34,18 @@ export function renderAgentApiDeclarations(): string {
     const functions = entries()
         .map(
             (entry) =>
-                `declare function ${entry.name}(args: ${renderParametersObjectType(entry.tool.parameters)}): ${entry.returnType};`,
+                `    ${entry.name}(args: ${renderParametersObjectType(entry.tool.parameters)}): ${entry.returnType};`,
         )
         .join("\n");
-    return `${functions}\n${CONSOLE_DECLARATION}`;
+    return `declare const tools: {\n${functions}\n};\n${CONSOLE_DECLARATION}`;
 }
 
 export function renderAgentApiUsageGuide(): string {
     const lines = entries().map(
         (entry) =>
-            `- ${entry.name}(args: ${renderParametersObjectType(entry.tool.parameters)}): ${entry.returnType} —— ${entry.tool.description}`,
+            `- tools.${entry.name}(args: ${renderParametersObjectType(entry.tool.parameters)}): ${entry.returnType} —— ${entry.tool.description}`,
     );
-    return ["程序内可直接使用以下全局函数（无需 import，支持 await），args 为参数对象，字段与工具参数一致：", ...lines].join(
+    return ["程序内通过全局 tools 对象调用以下 API（无需 import，支持 await），args 为参数对象，字段与工具参数一致：", ...lines].join(
         "\n",
     );
 }

@@ -108,11 +108,7 @@ export async function executeAgentProgram(
     }, restrictToWorkspace);
 
     const context = vm.createContext({
-        readFile: api.readFile,
-        writeFile: api.writeFile,
-        editFile: api.editFile,
-        shell: api.shell,
-        glob: api.glob,
+        tools: api,
         console: {
             log: (...parts: unknown[]) => stdoutLines.push(parts.map(formatValue).join(" ")),
             error: (...parts: unknown[]) => stderrLines.push(parts.map(formatValue).join(" ")),

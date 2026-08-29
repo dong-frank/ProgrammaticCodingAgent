@@ -10,7 +10,7 @@ description: 为编程智能体新增能力时使用。要求新能力同时提�
 为 agent 增加一个新能力时，必须同时提供两种形式的入口，共用同一套底层实现：
 
 - Tool 模式：function calling 工具（模型逐次调用）
-- Code Mode：注入到 exec_code 执行环境中的全局函数（模型在程序内直接调用）
+- Code Mode：注入到 exec_code 执行环境中的 `tools` 对象（模型在程序内通过 `tools.*` 调用）
 
 本指南描述完整执行链路与改动位置。
 
@@ -20,12 +20,14 @@ description: 为编程智能体新增能力时使用。要求新能力同时提�
 src/tools/<name>.ts           底层实现（核心函数 + 工具定义）
   ├── Tool 形式 → src/tools/registry.ts 注册 → Tool 模式提示词（自动）
   └── API 形式  → src/tools/api.ts 的 AgentApi 与元数据
-                  → src/tools/api-schema.ts 的映射
-                  → src/executor/code-executor.ts 的 vm 注入
-                  → Code 模式提示词与验证层声明（自动）
+                  → src/tools/api-schema.ts 的 SDK 声明与提示
+                  → src/executor/code-executor.ts 注入 tools 对象
+                  → Code 模式提示词（自动）
 ```
 
-提示词与验证层的渲染均由 schema 模块自动生成，无需手改；手动改动共四处：实现、Tool 注册、API 接线、Code 执行器注入。
+提示词与 SDK 声明由 schema 模块自动生成。Code Mode 程序作为异步函数体执行，只进行语法检查和 TypeScript 类型擦除；程序不支持 `import` 或动态 `import`，需要读取工作区文件时调用 `tools.readFile`，需要运行测试时调用 `tools.shell`。
+
+新增 API 时，手动修改实现、Tool 注册和 API 接线；Code 执行器始终注入完整的 `tools` 对象，无需为每个 API 单独增加注入项。
 
 ## 第一步：新建底层模块 src/tools/<name>.ts
 
@@ -96,7 +98,7 @@ async myOp(args) {
 { name: "myOp", returnType: "Promise<...>" },
 ```
 
-`src/tools/api-schema.ts` 中把 API 名映射到对应工具模块（缺失该映射时渲染直接抛错）：
+`src/tools/api-schema.ts` 中把 API 名映射到对应工具模块。该映射用于生成 `tools` SDK 的参数声明、返回类型和提示内容（缺失该映射时渲染直接抛错）：
 
 ```typescript
 const API_TOOLS: Record<string, ToolDefinition> = {
@@ -105,33 +107,31 @@ const API_TOOLS: Record<string, ToolDefinition> = {
 };
 ```
 
-## 第四步：注入 Code 执行器
+## 第四步：确认 Code Mode API
 
-`src/executor/code-executor.ts` 的 `vm.createContext` 注入列表中增加新函数（遗漏会导致程序内调用报 `xxx is not defined`）：
+`src/tools/api.ts` 返回的完整对象会由 `src/executor/code-executor.ts` 以 `tools` 全局对象注入：
 
 ```typescript
 const context = vm.createContext({
-    readFile: api.readFile,
-    writeFile: api.writeFile,
-    editFile: api.editFile,
-    shell: api.shell,
-    glob: api.glob,
-    ...,
+    tools: api,
 });
 ```
+
+新增 API 后不需要修改执行器注入代码。Code Mode 程序内使用 `await tools.myOp(args)`。
 
 ## 自动跟随（无需手改）
 
 - Code 模式提示词中的函数说明（`renderAgentApiUsageGuide`）
-- 验证层类型声明（`renderAgentApiDeclarations`，验证失败时模型会收到带行号的签名错误）
+- Code Mode SDK 声明（`renderAgentApiDeclarations`，供提示词和外部检查使用）
 - Tool 模式提示词中的工具说明（`renderToolUsageGuide`）
 
 ## 验证
 
 1. `npm run typecheck`：`AgentApiMeta.name` 与 `AgentApi` 的类型约束会校验接线一致性
 2. 工具形式自测：直接调用 `<name>Tool().execute(...)`，确认成功与失败两条路径
-3. API 形式自测：在 `executeAgentProgram` 中调用新全局函数，确认正确程序通过验证、类型错误被拦截
-4. 端到端：以真实任务验证模型能使用新能力
+3. API 形式自测：在 `executeAgentProgram` 中调用 `tools.myOp(...)`，确认 API 调用与错误结果符合预期
+4. 导入约束自测：确认静态 `import` 和动态 `import` 返回明确诊断；工作区测试通过 `tools.shell` 执行
+5. 端到端：以真实任务验证模型能使用新能力
 
 ## 设计原则
 
