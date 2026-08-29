@@ -4,7 +4,7 @@ import { resolveWorkspacePath } from "../paths.ts";
 import type { ToolDefinition } from "./types.ts";
 
 export const WRITE_FILE_DESCRIPTION =
-    "创建或覆盖写入指定文件，自动创建不存在的父目录；content 会按原样写入。生成包含反斜杠转义的源码时，请在 Agent Program 中使用 String.raw 模板字符串，避免外层模板字符串解释目标源码中的 \\n、\\r 等转义。";
+    "创建或完整覆盖写入指定文件，自动创建不存在的父目录；content 会按原样写入。已有文件的局部修改请使用 editFile。生成包含反斜杠转义的源码时，请在 Agent Program 中使用 String.raw 模板字符串，避免外层模板字符串解释目标源码中的 \\n、\\r 等转义。";
 
 export async function writeFileText(
     filePath: string,

@@ -3,7 +3,7 @@ import { readFileText } from "./read-file.ts";
 import { writeFileText } from "./write-file.ts";
 
 export const EDIT_DESCRIPTION =
-    "在指定文件中用字面文本 old_string 替换为 new_string。默认 old_string 必须恰好出现一次；出现多次时需设置 replace_all 为 true，或提供更精确的 old_string。";
+    "在指定文件中用字面文本 old_string 替换为 new_string，支持局部或多行修改。默认 old_string 必须恰好出现一次；出现多次时需设置 replace_all 为 true，或提供更精确的 old_string。";
 
 function countOccurrences(content: string, needle: string): number {
     if (needle.length === 0) {
