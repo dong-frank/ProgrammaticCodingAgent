@@ -17,8 +17,8 @@ import { runTask, prepareWorkspace, defaultWorkspaceRoot, type BenchmarkRunResul
 import { summarize, saveResults } from "../benchmark/report.ts";
 
 // 配置加载优先级：已存在的环境变量 > 当前目录 .env > 用户级 ~/.config/pca/.env
-loadEnv();
-loadEnv({ path: path.join(os.homedir(), ".config", "pca", ".env") });
+loadEnv({ quiet: true });
+loadEnv({ path: path.join(os.homedir(), ".config", "pca", ".env"), quiet: true });
 
 interface CliOptions {
     mode: string;
