@@ -1,11 +1,11 @@
 {
   "id": "csv-parser",
   "name": "CSV 解析器实现",
-  "description": "实现 src/csv.js 中的 parseCsv(text)：解析 CSV 文本为二维字符串数组（行的数组，每行为字段数组）。规则：普通字段用逗号分隔；双引号包裹的字段内可包含逗号、换行与双引号，字段内双引号用两个连续双引号（两个双引号字符）表示转义。修改 src/csv.js 即可。",
+  "description": "实现 src/csv.py 中的 parse_csv(text)：解析 CSV 文本为二维字符串数组（行的数组，每行为字段数组）。规则：普通字段用逗号分隔；双引号包裹的字段内可包含逗号、换行与双引号，字段内双引号用两个连续双引号（两个双引号字符）表示转义。修改 src/csv.py 即可。",
   "files": {
-    "src/csv.js": "export function parseCsv(text) {\n    throw new Error(\"尚未实现\");\n}\n"
+    "src/csv.py": "def parse_csv(text):\n    raise NotImplementedError(\"尚未实现\")\n"
   },
-  "verifyCommand": "node {{verify}} {{workspace}}",
+  "verifyCommand": "python3 {{verify}} {{workspace}}",
   "timeoutMs": 240000,
   "maxRounds": 15
 }

@@ -117,7 +117,7 @@ npm start -- benchmark --mode tool              # 只运行指定模式（tool /
 npm start -- benchmark --reset                  # 只重建任务初始工作区，不运行实验
 ```
 
-任务定义位于 `benchmark/tasks/<任务 id>/`：`task.json` 提供任务描述与初始文件，`verify.mjs` 是独立验收脚本。每次运行自动重建隔离工作区（`.workspace/benchmark/`），保证两种模式从同一初始状态开始；运行后按任务对比两模式的模型调用、工具调用、错误恢复次数、token、端到端与模型 API 耗时，结果保存到 `benchmark/results/`。
+任务定义位于 `benchmark/tasks/<任务 id>/`：`task.json` 提供任务描述与初始文件，`verify.py` 是独立验收脚本。每次运行自动重建隔离工作区（`.workspace/benchmark/`），保证两种模式从同一初始状态开始；运行后按任务对比两种模式的模型调用、工具调用、错误恢复次数、Token、端到端与模型 API 耗时，结果保存到 `benchmark/results/`。
 
 ## 架构文档
 

@@ -15,7 +15,12 @@ export interface ShellOutcome {
     timedOut: boolean;
 }
 
-export function runShellCommand(command: string, cwd: string, timeoutMs = SHELL_TIMEOUT_MS): Promise<ShellOutcome> {
+export function runShellCommand(
+    command: string,
+    cwd: string,
+    timeoutMs = SHELL_TIMEOUT_MS,
+    signal?: AbortSignal,
+): Promise<ShellOutcome> {
     return new Promise((resolve) => {
         exec(
             command,
@@ -23,7 +28,8 @@ export function runShellCommand(command: string, cwd: string, timeoutMs = SHELL_
                 cwd,
                 timeout: Math.max(1, Math.min(timeoutMs, SHELL_TIMEOUT_MS)),
                 maxBuffer: MAX_OUTPUT_CHARS * 2,
-                env: { ...process.env, LANG: "en_US.UTF-8" },
+                env: { PATH: process.env.PATH ?? "", LANG: "en_US.UTF-8" },
+                signal,
             },
             (error, stdout, stderr) => {
                 if (error === null) {

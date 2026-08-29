@@ -12,7 +12,7 @@
     "src/data/g.txt": "grape,100\n",
     "src/data/h.txt": "honeydew,61\n"
   },
-  "verifyCommand": "node {{verify}} {{workspace}}",
+  "verifyCommand": "python3 {{verify}} {{workspace}}",
   "timeoutMs": 240000,
   "maxRounds": 15
 }

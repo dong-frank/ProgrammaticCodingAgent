@@ -1,15 +1,15 @@
 {
   "id": "refactor-legacy",
   "name": "跨文件批量重构",
-  "description": "项目中有三个文件调用旧接口 legacyCalc（定义在 src/legacy.js）。请实现 src/calc.js 中的 calc 函数（两数相加），把所有对 legacyCalc 的调用改为 calc，并删除 src/legacy.js。完成后项目不应再引用 legacyCalc。",
+  "description": "项目中有三个文件调用旧接口 legacy_calc（定义在 src/legacy.py）。请实现 src/calc.py 中的 calc 函数（两数相加），把所有对 legacy_calc 的调用改为 calc，并删除 src/legacy.py。完成后项目不应再引用 legacy_calc。",
   "files": {
-    "src/calc.js": "export function calc(a, b) {\n    return a - b; // 错误的实现\n}\n",
-    "src/legacy.js": "export function legacyCalc(a, b) {\n    return a + b;\n}\n",
-    "src/use-a.js": "import { legacyCalc } from \"./legacy.js\";\n\nexport function sumPair(x, y) {\n    return legacyCalc(x, y);\n}\n",
-    "src/use-b.js": "import { legacyCalc } from \"./legacy.js\";\n\nexport function double(x) {\n    return legacyCalc(x, x);\n}\n",
-    "src/use-c.js": "import { legacyCalc } from \"./legacy.js\";\n\nexport function outerProduct(a, b) {\n    return [legacyCalc(a, b), a * b];\n}\n"
+    "src/calc.py": "def calc(a, b):\n    return a - b  # 错误的实现\n",
+    "src/legacy.py": "def legacy_calc(a, b):\n    return a + b\n",
+    "src/use_a.py": "from .legacy import legacy_calc\n\ndef sum_pair(x, y):\n    return legacy_calc(x, y)\n",
+    "src/use_b.py": "from .legacy import legacy_calc\n\ndef double(x):\n    return legacy_calc(x, x)\n",
+    "src/use_c.py": "from .legacy import legacy_calc\n\ndef outer_product(a, b):\n    return [legacy_calc(a, b), a * b]\n"
   },
-  "verifyCommand": "node {{verify}} {{workspace}}",
+  "verifyCommand": "python3 {{verify}} {{workspace}}",
   "timeoutMs": 240000,
   "maxRounds": 15
 }

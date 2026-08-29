@@ -1,4 +1,4 @@
-import vm from "node:vm";
+import { Worker } from "node:worker_threads";
 import ts from "typescript";
 import { createAgentApi } from "../tools/api.ts";
 import { validateAgentProgram } from "./validate.ts";
@@ -21,20 +21,6 @@ function errorMessage(error: unknown): string {
         }
     }
     return String(error);
-}
-
-async function waitWithTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout: Promise<never> = new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new ExecutionTimeoutError(timeoutMessage)), ms);
-    });
-    try {
-        return await Promise.race([promise, timeout]);
-    } finally {
-        if (timer !== undefined) {
-            clearTimeout(timer);
-        }
-    }
 }
 
 export function transpileAgentProgram(code: string): string {
@@ -77,6 +63,7 @@ export async function executeAgentProgram(
     code: string,
     cwd: string,
     restrictToWorkspace = true,
+    signal?: AbortSignal,
 ): Promise<CodeExecutionOutcome> {
     // 静态验证：语法与类型诊断，在执行前拦截错误代码
     const issues = validateAgentProgram(code);
@@ -101,65 +88,91 @@ export async function executeAgentProgram(
     const stdoutLines: string[] = [];
     const stderrLines: string[] = [];
     const commandErrors: string[] = [];
+    const executionController = new AbortController();
+    const abortExecution = (): void => executionController.abort();
+    if (signal?.aborted) {
+        executionController.abort();
+    } else {
+        signal?.addEventListener("abort", abortExecution, { once: true });
+    }
     const api = createAgentApi(cwd, (outcome) => {
         if (!outcome.ok) {
             commandErrors.push(`Shell 命令退出码：${outcome.exitCode}`);
         }
-    }, restrictToWorkspace);
+    }, restrictToWorkspace, executionController.signal);
 
-    const context = vm.createContext({
-        tools: api,
-        console: {
-            log: (...parts: unknown[]) => stdoutLines.push(parts.map(formatValue).join(" ")),
-            error: (...parts: unknown[]) => stderrLines.push(parts.map(formatValue).join(" ")),
-            warn: (...parts: unknown[]) => stderrLines.push(parts.map(formatValue).join(" ")),
-        },
+    const worker = new Worker(new URL("./code-worker.ts", import.meta.url), {
+        workerData: { code: js, syncTimeoutMs: SYNC_TIMEOUT_MS },
+        resourceLimits: { maxOldGenerationSizeMb: 128, stackSizeMb: 4 },
+        env: {},
+        execArgv: [],
     });
-
-    const wrapped = `(async () => {\n${js}\n})()`;
-
-    let execution: Promise<unknown>;
-    try {
-        execution = vm.runInContext(wrapped, context, { timeout: SYNC_TIMEOUT_MS }) as Promise<unknown>;
-    } catch (error) {
-        if (error instanceof Error && error.message.includes("Script execution timed out")) {
-            return {
-                status: "timeout",
-                error: `程序同步执行超时（${SYNC_TIMEOUT_MS} 毫秒）`,
-                stdout: stdoutLines.join("\n"),
-                stderr: stderrLines.join("\n"),
-                returnValue: "undefined",
-            };
-        }
-        const message = errorMessage(error);
-        return {
-            status: "runtime-error",
-            error: message,
-            stdout: stdoutLines.join("\n"),
-            stderr: stderrLines.join("\n"),
-            returnValue: "undefined",
-        };
-    }
-
-    let status: CodeExecutionOutcome["status"] = "success";
+    let status: CodeExecutionOutcome["status"] = "runtime-error";
     let error: string | null = null;
     let returnValue = "undefined";
-    try {
-        const value = await waitWithTimeout(
-            execution,
-            EXEC_CODE_TIMEOUT_MS,
-            `程序执行超时（${EXEC_CODE_TIMEOUT_MS} 毫秒）`,
-        );
-        returnValue = formatValue(value);
-    } catch (caught) {
-        if (caught instanceof ExecutionTimeoutError) {
+    let settled = false;
+    const shellApi = api;
+    const result = await new Promise<{ stdout: string[]; stderr: string[] }>((resolve) => {
+        const finish = (value: { stdout: string[]; stderr: string[] }): void => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
+        };
+        const timer = setTimeout(() => {
             status = "timeout";
-            error = caught.message;
-        } else {
+            error = `程序执行超时（${EXEC_CODE_TIMEOUT_MS} 毫秒）`;
+            executionController.abort();
+            void worker.terminate().then(() => finish({ stdout: stdoutLines, stderr: stderrLines }));
+        }, EXEC_CODE_TIMEOUT_MS);
+        const abort = (): void => {
+            status = "timeout";
+            error = "程序执行已中止";
+            executionController.abort();
+            void worker.terminate().then(() => finish({ stdout: stdoutLines, stderr: stderrLines }));
+        };
+        if (signal?.aborted) abort();
+        else signal?.addEventListener("abort", abort, { once: true });
+        worker.on("message", async (message: { type: string; id?: number; method?: string; args?: unknown; status?: CodeExecutionOutcome["status"]; error?: string | null; stdout?: string[]; stderr?: string[]; returnValue?: unknown }) => {
+            if (message.type === "tool-request" && message.id !== undefined && message.method !== undefined) {
+                try {
+                    const tool = shellApi[message.method as keyof typeof shellApi] as (args: unknown) => Promise<unknown>;
+                    const value = await tool(message.args);
+                    worker.postMessage({ type: "tool-result", id: message.id, ok: true, value });
+                } catch (caught) {
+                    worker.postMessage({ type: "tool-result", id: message.id, ok: false, error: errorMessage(caught) });
+                }
+                return;
+            }
+            if (message.type === "result") {
+                clearTimeout(timer);
+                if (signal !== undefined) signal.removeEventListener("abort", abort);
+                status = message.status ?? "runtime-error";
+                error = message.error ?? null;
+                returnValue = formatValue(message.returnValue);
+                finish({ stdout: message.stdout ?? [], stderr: message.stderr ?? [] });
+                await worker.terminate();
+            }
+        });
+        worker.on("error", (caught) => {
+            clearTimeout(timer);
+            executionController.abort();
             status = "runtime-error";
             error = errorMessage(caught);
-        }
-    }
+            void worker.terminate().then(() => finish({ stdout: stdoutLines, stderr: stderrLines }));
+        });
+        worker.on("exit", (exitCode) => {
+            if (!settled && exitCode !== 0) {
+                clearTimeout(timer);
+                executionController.abort();
+                status = "runtime-error";
+                error = `Code Worker 异常退出，退出码：${exitCode}`;
+                finish({ stdout: stdoutLines, stderr: stderrLines });
+            }
+        });
+    });
+    stdoutLines.push(...result.stdout);
+    stderrLines.push(...result.stderr);
+    if (signal !== undefined) signal.removeEventListener("abort", abortExecution);
 
     let stdout = stdoutLines.join("\n");
     if (stdout.length > MAX_STDOUT_CHARS) {
@@ -170,7 +183,7 @@ export async function executeAgentProgram(
     if (stderr.length > MAX_STDOUT_CHARS) {
         stderr = `${stderr.slice(0, MAX_STDOUT_CHARS)}\n[错误输出已截断]`;
     }
-    if (status === "success" && commandErrors.length > 0) {
+    if ((status as CodeExecutionOutcome["status"]) === "success" && commandErrors.length > 0) {
         status = "command-error";
         error = commandErrors.join("\n");
     }

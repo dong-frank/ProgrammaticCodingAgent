@@ -38,6 +38,7 @@ export function createAgentApi(
     cwd: string,
     onShellResult?: (outcome: ShellOutcome) => void,
     restrictToWorkspace = true,
+    signal?: AbortSignal,
 ): AgentApi {
     return {
         async readFile(args) {
@@ -50,7 +51,7 @@ export function createAgentApi(
             await editFileText(args.path, args.old_string, args.new_string, cwd, args.replace_all, restrictToWorkspace);
         },
         async shell(args) {
-            const outcome = await runShellCommand(args.command, cwd);
+            const outcome = await runShellCommand(args.command, cwd, undefined, signal);
             onShellResult?.(outcome);
             return outcome;
         },

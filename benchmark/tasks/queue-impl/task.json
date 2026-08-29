@@ -1,11 +1,11 @@
 {
   "id": "queue-impl",
   "name": "队列实现",
-  "description": "src/queue.js 中的队列实现有缺陷。实现先进先出队列：enqueue(value) 入队，dequeue() 出队并返回队首元素（空队列返回 undefined），peek() 查看队首但不删除，size 属性返回当前元素数量。修改 src/queue.js 即可。",
+  "description": "src/queue.py 中的队列实现有缺陷。实现先进先出队列：enqueue(value) 入队，dequeue() 出队并返回队首元素（空队列返回 None），peek() 查看队首但不删除，size 属性返回当前元素数量。修改 src/queue.py 即可。",
   "files": {
-    "src/queue.js": "export class Queue {\n    #items = [];\n    get size() {\n        return this.#items.length;\n    }\n    enqueue(value) {\n        this.#items.push(value);\n    }\n    dequeue() {\n        return this.#items.pop(); // 错误的实现：后进先出\n    }\n    peek() {\n        return this.#items[this.#items.length - 1]; // 错误的实现：查看的是队尾\n    }\n}\n"
+    "src/queue.py": "class Queue:\n    def __init__(self):\n        self._items = []\n\n    @property\n    def size(self):\n        return len(self._items)\n\n    def enqueue(self, value):\n        self._items.append(value)\n\n    def dequeue(self):\n        return self._items.pop() if self._items else None  # 错误的实现：后进先出\n\n    def peek(self):\n        return self._items[-1] if self._items else None  # 错误的实现：查看的是队尾\n"
   },
-  "verifyCommand": "node {{verify}} {{workspace}}",
+  "verifyCommand": "python3 {{verify}} {{workspace}}",
   "timeoutMs": 180000,
   "maxRounds": 15
 }

@@ -108,6 +108,7 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
             const result = await executeTool(config.registry, call.function.name, call.function.arguments, {
                 cwd: params.workspace,
                 restrictToWorkspace: params.restrictToWorkspace,
+                signal: params.signal,
             });
             if (result.error === true) {
                 roundHadError = true;

@@ -55,6 +55,16 @@ test("Code Mode 将运行时异常标记为 runtime-error", async () => {
     assert.equal(outcome.error, "runtime failure");
 });
 
+test("Code Mode 收到中止信号后终止 Worker", async () => {
+    const controller = new AbortController();
+    const execution = executeAgentProgram("await new Promise(() => {});", workspace, true, controller.signal);
+    controller.abort();
+    const outcome = await execution;
+
+    assert.equal(outcome.status, "timeout");
+    assert.match(outcome.error ?? "", /已中止/);
+});
+
 test("Code Mode 拒绝模块导入并返回明确诊断", async () => {
     const outcome = await executeAgentProgram('const module = await import("./src/csv.js"); return module;', workspace);
 

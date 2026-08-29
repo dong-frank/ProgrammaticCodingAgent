@@ -1,9 +1,9 @@
 {
   "id": "calculator-scaffold",
   "name": "计算器模块生成",
-  "description": "在项目根目录搭建计算器模块：新建 src/calculator.js，导出 add、subtract、multiply、divide 四个函数，divide 除数为 0 时抛出错误；新建 package.json 声明 type 为 module。不要创建测试文件。",
+  "description": "在项目根目录搭建计算器模块：新建 src/calculator.py，实现 add、subtract、multiply、divide 四个函数，divide 除数为 0 时抛出错误。不要创建测试文件。",
   "files": {},
-  "verifyCommand": "node {{verify}} {{workspace}}",
+  "verifyCommand": "python3 {{verify}} {{workspace}}",
   "timeoutMs": 240000,
   "maxRounds": 15
 }

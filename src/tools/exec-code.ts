@@ -68,7 +68,7 @@ export function execCodeTool(session: CodeProgramSession): ToolDefinition {
                     return { content: `程序版本：${revision}\n${lines.slice(start - 1, end).join("\n")}` };
                 }
 
-                const outcome = await executeAgentProgram(session.getSource(), ctx.cwd, ctx.restrictToWorkspace);
+                const outcome = await executeAgentProgram(session.getSource(), ctx.cwd, ctx.restrictToWorkspace, ctx.signal);
 
                 const lines: string[] = [];
                 const statusText = {

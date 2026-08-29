@@ -51,7 +51,7 @@ export async function loadTasks(tasksDir?: string): Promise<BenchmarkTask[]> {
         const data = JSON.parse(raw) as TaskFileContents;
         tasks.push({
             ...data,
-            verifyPath: path.join(dir, "verify.mjs"),
+            verifyPath: path.join(dir, "verify.py"),
         });
     }
     tasks.sort((a, b) => a.id.localeCompare(b.id));
