@@ -90,7 +90,7 @@ npm start
 
 ### Code Mode（`--mode code`）
 
-模型可见的唯一工具是 `exec_code`：把解决问题的 TypeScript 程序作为参数整体提交。本地执行器对代码做类型剥离与语法检查后，在受限执行环境中注入全局异步函数 `readFile`、`writeFile`、`shell`、`glob`（无需 import，支持 await），程序完成后返回标准输出、返回值、程序内工具调用记录与错误信息，模型据此迭代。
+模型可见的唯一工具是 `exec_code`：每次把完整的 TypeScript 异步函数体作为 `code` 参数提交。本地执行器对代码做类型剥离与语法检查后，在受限执行环境中注入 `tools.readFile`、`tools.writeFile`、`tools.editFile`、`tools.shell`、`tools.glob`（无需 import，支持 await），程序完成后返回标准输出、返回值、程序内工具调用记录与错误信息，模型据此迭代。
 
 ## 会话
 

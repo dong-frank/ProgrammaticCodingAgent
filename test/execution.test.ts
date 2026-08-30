@@ -5,9 +5,7 @@ import { executeAgentProgram } from "../src/executor/code-executor.ts";
 import { runShellCommand } from "../src/tools/shell.ts";
 import { loadTasks } from "../src/benchmark/task.ts";
 import { prepareWorkspace } from "../src/benchmark/runner.ts";
-import { CodeProgramSession } from "../src/executor/code-session.ts";
 import { execCodeTool } from "../src/tools/exec-code.ts";
-import { ContextManager } from "../src/agent/context-manager.ts";
 
 const workspace = process.cwd();
 
@@ -93,55 +91,25 @@ test("空初始文件任务也会创建工作目录", async () => {
     assert.equal(prepared, target);
 });
 
-test("Code Mode 在同一任务中增量维护唯一程序", async () => {
-    const tool = execCodeTool(new CodeProgramSession());
+test("Code Mode 每次调用都执行传入的完整程序", async () => {
+    const tool = execCodeTool();
     const context = { cwd: workspace };
-    const created = await tool.execute({ action: "create", code: "console.log('v1');" }, context);
-    assert.match(created.content, /程序版本：1/);
+    const result = await tool.execute({ code: "console.log('v1');" }, context);
 
-    const edited = await tool.execute(
-        {
-            action: "edit",
-            baseRevision: 1,
-            edits: [{ old_string: "v1", new_string: "v2" }],
-        },
-        context,
-    );
-    assert.match(edited.content, /程序版本：2/);
-
-    const read = await tool.execute({ action: "read", startLine: 1, endLine: 1 }, context);
-    assert.match(read.content, /console\.log\('v2'\)/);
+    assert.equal(result.error, undefined);
+    assert.match(result.content, /v1/);
 });
 
-test("Agent Program 编辑失败时返回可恢复的工具错误", async () => {
-    const tool = execCodeTool(new CodeProgramSession());
+test("Code Mode 每次调用之间不保留程序状态", async () => {
+    const tool = execCodeTool();
     const context = { cwd: workspace };
-    await tool.execute({ action: "create", code: "console.log('current');" }, context);
+    await tool.execute({ code: "console.log('current');" }, context);
     const result = await tool.execute(
-        { action: "edit", baseRevision: 1, edits: [{ old_string: "missing", new_string: "updated" }] },
+        { code: "console.log('next');" },
         context,
     );
 
-    assert.equal(result.error, true);
-    assert.match(result.content, /请使用 read 查看当前 Agent Program/);
-});
-
-test("模型上下文压缩 Code Mode 源码，完整轨迹保留原始内容", () => {
-    const context = new ContextManager();
-    context.append({
-        role: "assistant",
-        content: null,
-        tool_calls: [
-            {
-                id: "call-1",
-                type: "function",
-                function: { name: "exec_code", arguments: '{"action":"create","code":"长程序源码"}' },
-            },
-        ],
-    });
-    context.append({ role: "tool", tool_call_id: "call-1", content: "程序版本：1\n程序状态：正常" });
-    context.compactLastToolInteraction("exec_code", '{"action":"run"}', "程序版本：1\n程序状态：正常");
-
-    assert.equal(context.getMessages()[0]?.tool_calls?.[0]?.function.arguments, '{"action":"run"}');
-    assert.equal(context.getTranscript()[0]?.tool_calls?.[0]?.function.arguments, '{"action":"create","code":"长程序源码"}');
+    assert.equal(result.error, undefined);
+    assert.match(result.content, /next/);
+    assert.doesNotMatch(result.content, /current/);
 });

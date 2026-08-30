@@ -42,25 +42,6 @@ export class ContextManager {
         return this.transcript;
     }
 
-    compactLastToolInteraction(toolName: string, compactArguments: string, result: string): void {
-        for (let i = this.messages.length - 1; i >= 0; i -= 1) {
-            const message = this.messages[i];
-            if (message?.role !== "assistant" || message.tool_calls === undefined) {
-                continue;
-            }
-            const call = message.tool_calls.find((item) => item.function.name === toolName);
-            if (call === undefined) {
-                continue;
-            }
-            call.function.arguments = compactArguments;
-            const toolMessage = this.messages[i + 1];
-            if (toolMessage?.role === "tool") {
-                toolMessage.content = result;
-            }
-            return;
-        }
-    }
-
     private trim(): void {
         // 保留 system 消息，从最早的非 system 消息开始裁剪，并清除悬空的工具调用对
         while (this.messages.length > MAX_HISTORY_MESSAGES) {

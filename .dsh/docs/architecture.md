@@ -135,17 +135,17 @@ Code Mode 从模型响应中提取 Agent Program，整体交给 Code Executor，
 Agent Program 形态示例：
 
 ```typescript
-const files = await glob("src/**/*.ts");
+const files = await tools.glob({ pattern: "src/**/*.ts" });
 
 for (const file of files) {
-    const content = await read_file(file);
+    const content = await tools.readFile({ path: file });
 
     if (content.includes("TODO")) {
-        await write_file(file, content.replace("TODO", ""));
+        await tools.editFile({ path: file, old_string: "TODO", new_string: "" });
     }
 }
 
-await shell("npm test");
+await tools.shell({ command: "npm test" });
 ```
 
 程序内可用接口与 Tool Registry 一一对应，参数与返回值语义一致。

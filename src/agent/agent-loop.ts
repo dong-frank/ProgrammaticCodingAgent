@@ -7,7 +7,7 @@ import { ContextManager } from "./context-manager.ts";
 
 export interface AgentObserver {
     onRoundStart?: (round: number, maxRounds: number) => void;
-    onModelText?: (content: string) => void;
+    onModelText?: (content: string) => void | Promise<void>;
     onToolCall?: (name: string, rawArguments: string) => void;
     onToolResult?: (content: string) => void;
 }
@@ -84,7 +84,7 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
         const calls = response.message.tool_calls;
         if (calls === undefined || calls.length === 0) {
             if (response.message.content !== null && response.message.content.length > 0) {
-                params.observer?.onModelText?.(response.message.content);
+                await params.observer?.onModelText?.(response.message.content);
             }
             return {
                 finalMessage: response.message.content ?? "",
@@ -115,12 +115,6 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
             }
             params.observer?.onToolResult?.(result.content);
             context.append({ role: "tool", tool_call_id: call.id, content: result.content });
-            if (params.mode === "code" && call.function.name === "exec_code") {
-                const compactResult = result.content.length > 3_000
-                    ? `${result.content.slice(0, 1_200)}\n[中间输出已压缩]\n${result.content.slice(-1_800)}`
-                    : result.content;
-                context.compactLastToolInteraction("exec_code", '{"action":"run"}', compactResult);
-            }
             toolCalls += 1;
         }
         if (params.signal?.aborted) {

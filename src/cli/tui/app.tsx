@@ -25,9 +25,11 @@ interface AppProps {
 
 interface MessageEntry {
     id: number;
-    kind: "user" | "model" | "event" | "tool" | "done" | "error" | "info";
+    kind: "user" | "model" | "event" | "tool-call" | "tool-result" | "done" | "error" | "info";
     text: string;
 }
+
+const TYPEWRITER_DELAY_MS = 12;
 
 function formatDuration(ms: number): string {
     if (ms < 1000) {
@@ -55,13 +57,15 @@ const HELP_TEXT = [
 function renderMessage(message: MessageEntry): React.ReactElement {
     switch (message.kind) {
         case "user":
-            return <Text color="green">{message.text}</Text>;
+            return <Text color="green"><Text bold>你：</Text>{message.text}</Text>;
         case "model":
-            return <Text>{message.text}</Text>;
+            return <Text><Text color="magenta" bold>模型：</Text>{message.text}</Text>;
         case "event":
             return <Text color="cyan">{message.text}</Text>;
-        case "tool":
-            return <Text color="gray">{message.text}</Text>;
+        case "tool-call":
+            return <Text color="yellow"><Text bold>工具调用：</Text>{message.text}</Text>;
+        case "tool-result":
+            return <Text color="gray"><Text bold>工具结果：</Text>{message.text}</Text>;
         case "done":
             return <Text color="green" bold>{message.text}</Text>;
         case "error":
@@ -110,6 +114,7 @@ export function App(props: AppProps): React.ReactElement {
     const [messages, setMessages] = useState<MessageEntry[]>([]);
     const [input, setInput] = useState("");
     const [running, setRunning] = useState(false);
+    const [streamingText, setStreamingText] = useState<string | null>(null);
 
     const recordRef = useRef<SessionRecord>(props.initialRecord);
     const contextRef = useRef<ContextManager>(props.initialContext);
@@ -137,14 +142,20 @@ export function App(props: AppProps): React.ReactElement {
         onRoundStart(round, maxRounds) {
             push({ kind: "event", text: `[轮次 ${round}/${maxRounds}]` });
         },
-        onModelText(content) {
+        async onModelText(content) {
+            setStreamingText("");
+            for (const character of Array.from(content)) {
+                setStreamingText((previous) => `${previous ?? ""}${character}`);
+                await new Promise<void>((resolve) => setTimeout(resolve, TYPEWRITER_DELAY_MS));
+            }
             push({ kind: "model", text: content });
+            setStreamingText(null);
         },
         onToolCall(name, rawArguments) {
-            push({ kind: "event", text: `→ 工具 ${name}(${formatArgs(rawArguments)})` });
+            push({ kind: "tool-call", text: `${name}(${formatArgs(rawArguments)})` });
         },
         onToolResult(content) {
-            push({ kind: "tool", text: content });
+            push({ kind: "tool-result", text: content });
         },
     };
 
@@ -286,6 +297,9 @@ export function App(props: AppProps): React.ReactElement {
                 programmatic-coding-agent v0.1.0
             </Text>
             <Static items={messages}>{renderMessage}</Static>
+            {streamingText !== null && (
+                <Text><Text color="magenta" bold>模型：</Text>{streamingText}<Text color="gray">▌</Text></Text>
+            )}
             <Box borderStyle="round" borderColor="cyan" paddingX={1}>
                 <Box flexDirection="column" width="100%">
                     <Text color={running ? "yellow" : undefined}>{`${mode}> `}<TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus /></Text>
