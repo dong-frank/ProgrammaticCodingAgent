@@ -1,5 +1,7 @@
 export type ChatRole = "system" | "user" | "assistant" | "tool";
 
+export const MODEL_CONTEXT_WINDOW = 128_000;
+
 export interface ToolCall {
     id: string;
     type: "function";

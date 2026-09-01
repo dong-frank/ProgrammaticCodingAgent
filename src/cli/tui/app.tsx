@@ -10,6 +10,7 @@ import type { SessionRecord } from "../../session/types.ts";
 import type { LlmClient } from "../../llm/client.ts";
 import { isMode, MODES, type Mode } from "../../modes/types.ts";
 import { formatArgs } from "../ui.ts";
+import { MODEL_CONTEXT_WINDOW } from "../../llm/types.ts";
 
 export interface TuiAppOptions {
     maxRounds: number;
@@ -44,6 +45,12 @@ function metricsSummary(metrics: AgentMetrics): string {
     return `模型调用 ${metrics.llmCalls} 次 · 工具调用 ${metrics.toolCalls} 次 · 恢复 ${metrics.errorRecoveryEvents} 次 · token ${metrics.totalTokens} · 耗时 ${formatDuration(metrics.durationMs)}`;
 }
 
+function contextIndicator(inputTokens: number): string {
+    const ratio = Math.min(1, Math.max(0, inputTokens / MODEL_CONTEXT_WINDOW));
+    const ring = ["○", "◔", "◑", "◕", "●"][Math.min(4, Math.floor(ratio * 5))];
+    return `${ring} 上下文 ${(ratio * 100).toFixed(1)}%`;
+}
+
 const HELP_TEXT = [
     "可用命令",
     "/help          显示本帮助",
@@ -65,7 +72,6 @@ function renderMessage(message: MessageEntry, width: number): React.ReactElement
         case "model":
             return (
                 <Box width={width} flexDirection="column">
-                    <Text color="magenta" bold>● 模型</Text>
                     <Box marginLeft={2}>
                         <Text>{renderMarkdown(message.text, width)}</Text>
                     </Box>
@@ -109,7 +115,7 @@ function renderMarkdown(content: string, width: number): string {
 }
 
 function renderStreamingText(text: string, kind: "model" | "reasoning"): React.ReactElement {
-    const prefix = kind === "reasoning" ? "" : "● ";
+    const prefix = "";
     const lines = text.split("\n").map((line, index) => `${index === 0 ? prefix : "  " + line}`).join("\n");
     return <Text color={kind === "reasoning" ? "gray" : undefined} italic={kind === "reasoning"}>{lines}<Text color="gray">▌</Text></Text>;
 }
@@ -150,7 +156,7 @@ const PREVIEW_MESSAGES: MessageEntry[] = [
     { id: 6, kind: "tool-call", text: 'edit_file(path: "src/math.py", old_string: "return a * b", new_string: "return a + b")' },
     { id: 7, kind: "tool-result", text: "文件修改成功" },
     { id: 8, kind: "model", text: "已修复 add 函数，并完成文件验证。" },
-    { id: 9, kind: "done", text: "任务已完成\n（模型调用 2 次 · 工具调用 2 次 · token 1,248 · 耗时 3.2 秒）" },
+    { id: 9, kind: "done", text: "任务已完成" },
 ];
 
 export function PreviewApp(): React.ReactElement {
@@ -158,6 +164,7 @@ export function PreviewApp(): React.ReactElement {
     const [messages, setMessages] = useState<MessageEntry[]>([]);
     const [input, setInput] = useState("");
     const contentWidth = Math.max(40, (stdout.columns ?? 80) - 2);
+    const contextTokens = Math.min(MODEL_CONTEXT_WINDOW, messages.length * 7_200);
 
     useEffect(() => {
         let cancelled = false;
@@ -191,6 +198,8 @@ export function PreviewApp(): React.ReactElement {
                     <TextInput value={input} onChange={setInput} onSubmit={() => setInput("")} focus />
                 </Box>
                 <Text color="gray">code · preview · {messages.length === PREVIEW_MESSAGES.length ? "演示完成" : "正在演示执行链路"}</Text>
+                <Text color="gray">{contextIndicator(contextTokens)}</Text>
+                <Text color="gray">模型调用 2 次 · 工具调用 2 次 · 恢复 0 次 · token 1,248 · 耗时 3.2 秒</Text>
                 <Text color="gray">按 Ctrl+C 退出预览</Text>
             </Box>
             <Text color="gray">{`预览进度 ${messages.length}/${PREVIEW_MESSAGES.length} · 按 Ctrl+C 退出`}</Text>
@@ -217,6 +226,8 @@ export function App(props: AppProps): React.ReactElement {
     const [running, setRunning] = useState(false);
     const [streamingText, setStreamingText] = useState<string | null>(null);
     const [streamingKind, setStreamingKind] = useState<"model" | "reasoning">("model");
+    const [contextTokens, setContextTokens] = useState(0);
+    const [lastMetrics, setLastMetrics] = useState<AgentMetrics | null>(null);
 
     const recordRef = useRef<SessionRecord>(props.initialRecord);
     const contextRef = useRef<ContextManager>(props.initialContext);
@@ -251,6 +262,9 @@ export function App(props: AppProps): React.ReactElement {
             push({ kind: "reasoning", text: content });
             setStreamingText(null);
         },
+        onContextUsage(inputTokens) {
+            setContextTokens(inputTokens);
+        },
         async onModelText(content) {
             setStreamingKind("model");
             setStreamingText("");
@@ -283,10 +297,11 @@ export function App(props: AppProps): React.ReactElement {
                 observer,
                 context: contextRef.current,
             });
+            setLastMetrics(result.metrics);
             if (result.stoppedReason === "completed") {
-                push({ kind: "done", text: `${result.finalMessage}\n（${metricsSummary(result.metrics)}）` });
+                push({ kind: "done", text: result.finalMessage });
             } else {
-                push({ kind: "error", text: `达到最大轮次未能完成任务（${metricsSummary(result.metrics)}）` });
+                push({ kind: "error", text: "达到最大轮次未能完成任务" });
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -421,6 +436,8 @@ export function App(props: AppProps): React.ReactElement {
                 <Box flexDirection="column" width="100%">
                     <Text color="gray">{`模式 ${mode} · ${running ? "正在处理" : "就绪"}`}</Text>
                     <Text color="gray">{`模型 ${client.getModelName()} · 会话 ${recordId}`}</Text>
+                    <Text color="gray">{contextIndicator(contextTokens)}</Text>
+                    {lastMetrics !== null && <Text color="gray">{metricsSummary(lastMetrics)}</Text>}
                     <Text color="gray">{`工作目录 ${workspace}`}</Text>
                 </Box>
             </Box>

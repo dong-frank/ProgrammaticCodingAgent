@@ -13,6 +13,11 @@ export interface ChatRequest {
     signal?: AbortSignal;
 }
 
+export interface SummaryResult {
+    content: string;
+    usage: ChatResult["usage"];
+}
+
 const REQUEST_TIMEOUT_MS = 300_000;
 
 export class LlmClient {
@@ -39,16 +44,40 @@ export class LlmClient {
     }
 
     async chat(request: ChatRequest): Promise<ChatResult> {
+        const response = await this.createResponse({
+            input: toResponseInput(request.messages),
+            tools: request.tools?.map(toResponseTool),
+            tool_choice: request.tools === undefined || request.tools.length === 0 ? undefined : "auto",
+            reasoning: { effort: "medium", summary: "auto" },
+        }, request.signal);
+        return toChatResult(response, this.model);
+    }
+
+    async summarize(messages: ChatMessage[], signal?: AbortSignal): Promise<SummaryResult> {
+        const response = await this.createResponse({
+            input: [
+                ...toResponseInput(messages),
+                {
+                    role: "user",
+                    content: "请将以上历史交互压缩为简洁的编程任务摘要。保留任务目标、已修改文件、已完成操作、验证结果、失败尝试、未完成事项和重要约束。只输出摘要正文，不要添加其他说明。",
+                },
+            ],
+            reasoning: { effort: "low", summary: "auto" },
+        }, signal);
+        const result = toChatResult(response, this.model);
+        if (result.message.content === null || result.message.content.trim().length === 0) {
+            throw new Error("历史上下文压缩未返回摘要内容");
+        }
+        return { content: result.message.content, usage: result.usage };
+    }
+
+    private async createResponse(
+        request: OpenAI.Responses.ResponseCreateParamsNonStreaming,
+        signal?: AbortSignal,
+    ): Promise<OpenAI.Responses.Response> {
         const startedAt = Date.now();
-        let response: OpenAI.Responses.Response;
         try {
-            response = await this.client.responses.create({
-                model: this.model,
-                input: toResponseInput(request.messages),
-                tools: request.tools?.map(toResponseTool),
-                tool_choice: request.tools === undefined || request.tools.length === 0 ? undefined : "auto",
-                reasoning: { effort: "medium", summary: "auto" },
-            }, { signal: request.signal });
+            return await this.client.responses.create(request, { signal });
         } catch (error) {
             if (error instanceof OpenAI.APIError) {
                 throw new Error(`模型接口返回 ${error.status}: ${error.message}`);
@@ -57,8 +86,11 @@ export class LlmClient {
         } finally {
             this.apiDurationMs += Date.now() - startedAt;
         }
+    }
+}
 
-        const toolCalls = response.output
+function toChatResult(response: OpenAI.Responses.Response, model: string): ChatResult {
+    const toolCalls = response.output
             .filter((item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === "function_call")
             .map((call) => ({
                 id: call.call_id,
@@ -69,13 +101,13 @@ export class LlmClient {
                 },
             }));
 
-        const content = response.output
+    const content = response.output
             .filter((item): item is OpenAI.Responses.ResponseOutputMessage => item.type === "message")
             .flatMap((item) => item.content)
             .filter((part): part is OpenAI.Responses.ResponseOutputText => part.type === "output_text")
             .map((part) => part.text)
             .join("");
-        const reasoningSummary = response.output
+    const reasoningSummary = response.output
             .filter((item): item is OpenAI.Responses.ResponseReasoningItem => item.type === "reasoning")
             .flatMap((item) => [
                 ...item.summary.map((part) => part.text),
@@ -83,23 +115,22 @@ export class LlmClient {
             ])
             .join("");
 
-        return {
-            message: {
-                role: "assistant",
-                content: content.length === 0 ? null : content,
-                tool_calls: toolCalls.length === 0 ? undefined : toolCalls,
-                response_output_items: response.output,
-            },
-            reasoningSummary: reasoningSummary.length === 0 ? null : reasoningSummary,
-            finishReason: response.status ?? "",
-            usage: {
-                promptTokens: response.usage?.input_tokens ?? 0,
-                completionTokens: response.usage?.output_tokens ?? 0,
-                totalTokens: response.usage?.total_tokens ?? 0,
-            },
-            model: response.model ?? this.model,
-        };
-    }
+    return {
+        message: {
+            role: "assistant",
+            content: content.length === 0 ? null : content,
+            tool_calls: toolCalls.length === 0 ? undefined : toolCalls,
+            response_output_items: response.output,
+        },
+        reasoningSummary: reasoningSummary.length === 0 ? null : reasoningSummary,
+        finishReason: response.status ?? "",
+        usage: {
+            promptTokens: response.usage?.input_tokens ?? 0,
+            completionTokens: response.usage?.output_tokens ?? 0,
+            totalTokens: response.usage?.total_tokens ?? 0,
+        },
+        model: response.model ?? model,
+    };
 }
 
 function toResponseInput(messages: ChatMessage[]): OpenAI.Responses.ResponseInput {

@@ -1,6 +1,10 @@
 import type { ChatMessage } from "../llm/types.ts";
+import { mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 export const MAX_HISTORY_MESSAGES = 200;
+const TOOL_RESULT_ARCHIVE_CHARS = 4_000;
 
 export class ContextManager {
     private readonly messages: ChatMessage[];
@@ -40,6 +44,40 @@ export class ContextManager {
 
     getTranscript(): ChatMessage[] {
         return this.transcript;
+    }
+
+    async archiveLargeToolResults(): Promise<void> {
+        const archiveDir = path.join(os.homedir(), ".pca", "context-archives");
+        await mkdir(archiveDir, { recursive: true });
+        let archiveIndex = 0;
+        for (const message of this.messages) {
+            if (message.role !== "tool" || message.content === null || message.content.length < TOOL_RESULT_ARCHIVE_CHARS) {
+                continue;
+            }
+            if (message.content.startsWith("工具结果已归档：")) {
+                continue;
+            }
+            archiveIndex += 1;
+            const filename = `tool-result-${Date.now()}-${archiveIndex}.txt`;
+            const archivePath = path.join(archiveDir, filename);
+            await writeFile(archivePath, message.content, "utf8");
+            message.content = `工具结果已归档：${archivePath}\n原始结果长度：${message.content.length} 字符`;
+        }
+    }
+
+    replaceHistoryWithSummary(summary: string, keepRecentMessages = 12): void {
+        const systemMessages = this.messages.filter((message) => message.role === "system");
+        const nonSystemMessages = this.messages.filter((message) => message.role !== "system");
+        let recentStart = Math.max(0, nonSystemMessages.length - keepRecentMessages);
+        while (recentStart > 0 && nonSystemMessages[recentStart]?.role === "tool") {
+            recentStart -= 1;
+        }
+        const recentMessages = nonSystemMessages.slice(recentStart).map(cloneMessage);
+        const summaryMessage: ChatMessage = {
+            role: "user",
+            content: `历史上下文摘要（早期交互已归档）：\n${summary}`,
+        };
+        this.messages.splice(0, this.messages.length, ...systemMessages.map(cloneMessage), summaryMessage, ...recentMessages);
     }
 
     private trim(): void {

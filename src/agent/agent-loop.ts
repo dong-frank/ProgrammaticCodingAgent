@@ -4,9 +4,14 @@ import type { Mode, ModeConfig } from "../modes/types.ts";
 import { createToolModeConfig } from "../modes/tool-mode.ts";
 import { createCodeModeConfig } from "../modes/code-mode.ts";
 import { ContextManager } from "./context-manager.ts";
+import { MODEL_CONTEXT_WINDOW } from "../llm/types.ts";
+
+const CONTEXT_ARCHIVE_THRESHOLD = MODEL_CONTEXT_WINDOW * 0.5;
+const CONTEXT_SUMMARY_THRESHOLD = MODEL_CONTEXT_WINDOW * 0.7;
 
 export interface AgentObserver {
     onRoundStart?: (round: number, maxRounds: number) => void;
+    onContextUsage?: (inputTokens: number, contextWindow: number) => void;
     onReasoningSummary?: (content: string) => void | Promise<void>;
     onModelText?: (content: string) => void | Promise<void>;
     onToolCall?: (name: string, rawArguments: string) => void;
@@ -61,6 +66,7 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
     let promptTokens = 0;
     let completionTokens = 0;
     let totalTokens = 0;
+    let contextCompactionArmed = true;
     const startedAt = Date.now();
     const apiBaseline = params.client.getApiDurationMs();
 
@@ -79,6 +85,23 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
         promptTokens += response.usage.promptTokens;
         completionTokens += response.usage.completionTokens;
         totalTokens += response.usage.totalTokens;
+        params.observer?.onContextUsage?.(response.usage.promptTokens, MODEL_CONTEXT_WINDOW);
+
+        if (response.usage.promptTokens < CONTEXT_SUMMARY_THRESHOLD) {
+            contextCompactionArmed = true;
+        }
+        if (response.usage.promptTokens >= CONTEXT_ARCHIVE_THRESHOLD) {
+            await context.archiveLargeToolResults();
+        }
+        if (response.usage.promptTokens >= CONTEXT_SUMMARY_THRESHOLD && contextCompactionArmed) {
+            const summary = await params.client.summarize(context.getMessages(), params.signal);
+            llmCalls += 1;
+            promptTokens += summary.usage.promptTokens;
+            completionTokens += summary.usage.completionTokens;
+            totalTokens += summary.usage.totalTokens;
+            context.replaceHistoryWithSummary(summary.content);
+            contextCompactionArmed = false;
+        }
 
         context.append(response.message);
         if (response.reasoningSummary !== null && response.reasoningSummary.trim().length > 0) {
