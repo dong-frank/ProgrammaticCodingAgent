@@ -11,7 +11,7 @@ import { ContextManager } from "../agent/context-manager.ts";
 import { SessionStore, saveSession } from "../session/store.ts";
 import type { SessionRecord } from "../session/types.ts";
 import { createAgentObserver, errorText } from "./ui.ts";
-import { startInteractive } from "./tui/app.tsx";
+import { startInteractive, startPreview } from "./tui/app.tsx";
 import { loadTasks } from "../benchmark/task.ts";
 import { runTask, prepareWorkspace, defaultWorkspaceRoot, type BenchmarkRunResult } from "../benchmark/runner.ts";
 import { summarize, saveResults } from "../benchmark/report.ts";
@@ -27,6 +27,7 @@ interface CliOptions {
     workspace: string;
     quiet?: boolean;
     session?: string;
+    preview?: boolean;
 }
 
 function validateOptions(options: CliOptions): void {
@@ -146,10 +147,15 @@ program
     .option("-w, --workspace <path>", "工作目录", process.cwd())
     .option("-q, --quiet", "不显示过程日志，只输出结果")
     .option("--session <id>", "恢复指定会话继续执行")
+    .option("--preview", "预览 TUI 执行链路，不调用模型")
     .action(async (task: string | undefined, options: CliOptions) => {
         try {
             const resolved = { ...options, mode: options.mode ?? "code" };
             validateOptions(resolved);
+            if (options.preview === true) {
+                await startPreview();
+                return;
+            }
             if (task === undefined) {
                 await runInteractive(resolved);
             } else {

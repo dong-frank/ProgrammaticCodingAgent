@@ -7,6 +7,7 @@ import { ContextManager } from "./context-manager.ts";
 
 export interface AgentObserver {
     onRoundStart?: (round: number, maxRounds: number) => void;
+    onReasoningSummary?: (content: string) => void | Promise<void>;
     onModelText?: (content: string) => void | Promise<void>;
     onToolCall?: (name: string, rawArguments: string) => void;
     onToolResult?: (content: string) => void;
@@ -80,6 +81,9 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
         totalTokens += response.usage.totalTokens;
 
         context.append(response.message);
+        if (response.reasoningSummary !== null && response.reasoningSummary.trim().length > 0) {
+            await params.observer?.onReasoningSummary?.(response.reasoningSummary);
+        }
 
         const calls = response.message.tool_calls;
         if (calls === undefined || calls.length === 0) {

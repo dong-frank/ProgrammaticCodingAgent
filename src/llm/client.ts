@@ -40,13 +40,14 @@ export class LlmClient {
 
     async chat(request: ChatRequest): Promise<ChatResult> {
         const startedAt = Date.now();
-        let completion: OpenAI.Chat.Completions.ChatCompletion;
+        let response: OpenAI.Responses.Response;
         try {
-            completion = await this.client.chat.completions.create({
+            response = await this.client.responses.create({
                 model: this.model,
-                messages: toSdkMessages(request.messages),
-                tools: request.tools,
+                input: toResponseInput(request.messages),
+                tools: request.tools?.map(toResponseTool),
                 tool_choice: request.tools === undefined || request.tools.length === 0 ? undefined : "auto",
+                reasoning: { effort: "medium", summary: "auto" },
             }, { signal: request.signal });
         } catch (error) {
             if (error instanceof OpenAI.APIError) {
@@ -57,65 +58,80 @@ export class LlmClient {
             this.apiDurationMs += Date.now() - startedAt;
         }
 
-        const choice = completion.choices[0];
-        if (choice === undefined) {
-            throw new Error("模型接口响应缺少 choices 内容");
-        }
-
-        const message = choice.message;
-        const toolCalls: ToolCall[] | undefined = message.tool_calls
-            ?.filter(
-                (call): call is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall =>
-                    call.type === "function",
-            )
+        const toolCalls = response.output
+            .filter((item): item is OpenAI.Responses.ResponseFunctionToolCall => item.type === "function_call")
             .map((call) => ({
-                id: call.id,
-                type: "function",
+                id: call.call_id,
+                type: "function" as const,
                 function: {
-                    name: call.function.name,
-                    arguments: call.function.arguments,
+                    name: call.name,
+                    arguments: call.arguments,
                 },
             }));
 
-        const usage = completion.usage;
+        const content = response.output
+            .filter((item): item is OpenAI.Responses.ResponseOutputMessage => item.type === "message")
+            .flatMap((item) => item.content)
+            .filter((part): part is OpenAI.Responses.ResponseOutputText => part.type === "output_text")
+            .map((part) => part.text)
+            .join("");
+        const reasoningSummary = response.output
+            .filter((item): item is OpenAI.Responses.ResponseReasoningItem => item.type === "reasoning")
+            .flatMap((item) => [
+                ...item.summary.map((part) => part.text),
+                ...(item.content?.map((part) => part.text) ?? []),
+            ])
+            .join("");
+
         return {
             message: {
                 role: "assistant",
-                content: message.content,
-                tool_calls: toolCalls,
+                content: content.length === 0 ? null : content,
+                tool_calls: toolCalls.length === 0 ? undefined : toolCalls,
+                response_output_items: response.output,
             },
-            finishReason: choice.finish_reason ?? "",
+            reasoningSummary: reasoningSummary.length === 0 ? null : reasoningSummary,
+            finishReason: response.status ?? "",
             usage: {
-                promptTokens: usage?.prompt_tokens ?? 0,
-                completionTokens: usage?.completion_tokens ?? 0,
-                totalTokens: usage?.total_tokens ?? 0,
+                promptTokens: response.usage?.input_tokens ?? 0,
+                completionTokens: response.usage?.output_tokens ?? 0,
+                totalTokens: response.usage?.total_tokens ?? 0,
             },
-            model: completion.model,
+            model: response.model ?? this.model,
         };
     }
 }
 
-function toSdkMessages(messages: ChatMessage[]): OpenAI.Chat.ChatCompletionMessageParam[] {
-    return messages.map((message) => {
+function toResponseInput(messages: ChatMessage[]): OpenAI.Responses.ResponseInput {
+    return messages.flatMap((message) => {
+        if (message.role === "assistant" && message.response_output_items !== undefined) {
+            return message.response_output_items as OpenAI.Responses.ResponseInputItem[];
+        }
         switch (message.role) {
             case "system":
-                return { role: "system", content: message.content ?? "" };
+                return [{ role: "system", content: message.content ?? "" }];
             case "user":
-                return { role: "user", content: message.content ?? "" };
+                return [{ role: "user", content: message.content ?? "" }];
             case "assistant":
-                return {
-                    role: "assistant",
-                    content: message.content,
-                    tool_calls: message.tool_calls,
-                };
+                return [{ role: "assistant", content: message.content ?? "" }];
             case "tool":
-                return {
-                    role: "tool",
-                    tool_call_id: message.tool_call_id ?? "",
-                    content: message.content ?? "",
-                };
+                return [{
+                    type: "function_call_output",
+                    call_id: message.tool_call_id ?? "",
+                    output: message.content ?? "",
+                }];
         }
     });
+}
+
+function toResponseTool(tool: ToolSchema): OpenAI.Responses.FunctionTool {
+    return {
+        type: "function",
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: tool.function.parameters,
+        strict: false,
+    };
 }
 
 export function createLlmClientFromEnv(overrides?: { model?: string }): LlmClient {

@@ -79,5 +79,8 @@ function cloneMessage(message: ChatMessage): ChatMessage {
             ...call,
             function: { ...call.function },
         })),
+        response_output_items: message.response_output_items === undefined
+            ? undefined
+            : structuredClone(message.response_output_items),
     };
 }

@@ -38,6 +38,10 @@ export function modelText(content: string): string {
     return `${pc.dim("模型")} ${content}`;
 }
 
+export function reasoningSummary(content: string): string {
+    return `${pc.magenta("思考摘要")} ${content}`;
+}
+
 export function toolCall(name: string, rawArguments: string): string {
     return `${pc.cyan("→ 工具")} ${pc.bold(name)}(${formatArgs(rawArguments)})`;
 }
@@ -58,6 +62,9 @@ export function createAgentObserver(log: (text: string) => void): AgentObserver 
     return {
         onRoundStart(round, maxRounds) {
             log(roundHeader(round, maxRounds));
+        },
+        onReasoningSummary(content) {
+            log(reasoningSummary(content));
         },
         onModelText(content) {
             log(modelText(content));

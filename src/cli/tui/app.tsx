@@ -1,6 +1,8 @@
-import React, { useRef, useState } from "react";
-import { Box, Text, Static, useApp, useStdout, render } from "ink";
+import React, { useEffect, useRef, useState } from "react";
+import { Box, Text, useApp, useStdout, render } from "ink";
 import TextInput from "ink-text-input";
+import { marked } from "marked";
+import TerminalRenderer from "marked-terminal";
 import { runAgent, type AgentObserver, type AgentMetrics } from "../../agent/agent-loop.ts";
 import { ContextManager } from "../../agent/context-manager.ts";
 import { SessionStore, saveSession } from "../../session/store.ts";
@@ -25,7 +27,7 @@ interface AppProps {
 
 interface MessageEntry {
     id: number;
-    kind: "user" | "model" | "event" | "tool-call" | "tool-result" | "done" | "error" | "info";
+    kind: "user" | "model" | "reasoning" | "event" | "tool-call" | "tool-result" | "done" | "error" | "info";
     text: string;
 }
 
@@ -54,25 +56,62 @@ const HELP_TEXT = [
     "/quit          保存并退出（等价 /exit）",
 ].join("\n");
 
-function renderMessage(message: MessageEntry): React.ReactElement {
+function renderMessage(message: MessageEntry, width: number): React.ReactElement {
+    const lines = message.text.split("\n");
+    const body = (prefix: string): string => lines.map((line, index) => `${index === 0 ? prefix : "  " + line}`).join("\n");
     switch (message.kind) {
         case "user":
-            return <Text color="green"><Text bold>你：</Text>{message.text}</Text>;
+            return <Text color="green"><Text bold>❯ </Text>{message.text}</Text>;
         case "model":
-            return <Text><Text color="magenta" bold>模型：</Text>{message.text}</Text>;
+            return (
+                <Box width={width} flexDirection="column">
+                    <Text color="magenta" bold>● 模型</Text>
+                    <Box marginLeft={2}>
+                        <Text>{renderMarkdown(message.text, width)}</Text>
+                    </Box>
+                </Box>
+            );
+        case "reasoning":
+            return <Text color="gray" italic>{message.text}</Text>;
         case "event":
             return <Text color="cyan">{message.text}</Text>;
         case "tool-call":
-            return <Text color="yellow"><Text bold>工具调用：</Text>{message.text}</Text>;
+            return (
+                <Box width={width} borderStyle="round" borderColor="yellow" paddingX={1} flexDirection="column">
+                    <Text color="yellow" bold>工具调用</Text>
+                    <Text color="yellow">{message.text.trim().length === 0 ? "（无参数）" : message.text}</Text>
+                </Box>
+            );
         case "tool-result":
-            return <Text color="gray"><Text bold>工具结果：</Text>{message.text}</Text>;
+            return (
+                <Box width={width} borderStyle="round" borderColor="gray" paddingX={1} flexDirection="column">
+                    <Text color="gray" bold>工具结果</Text>
+                    <Text color="gray">{message.text.trim().length === 0 ? "（无结果）" : message.text}</Text>
+                </Box>
+            );
         case "done":
-            return <Text color="green" bold>{message.text}</Text>;
+            return <Text color="green" bold>{body("✔ ")}</Text>;
         case "error":
-            return <Text color="red">{message.text}</Text>;
+            return <Text color="red">{body("✘ ")}</Text>;
         case "info":
-            return <Text>{message.text}</Text>;
+            return <Text color="gray">{body("  ")}</Text>;
     }
+}
+
+function renderMarkdown(content: string, width: number): string {
+    const output = marked.parse(content, {
+        renderer: new TerminalRenderer({ width: Math.max(20, width - 2) }),
+    });
+    if (typeof output !== "string") {
+        throw new Error("Markdown 渲染返回了异步结果");
+    }
+    return output.trim();
+}
+
+function renderStreamingText(text: string, kind: "model" | "reasoning"): React.ReactElement {
+    const prefix = kind === "reasoning" ? "" : "● ";
+    const lines = text.split("\n").map((line, index) => `${index === 0 ? prefix : "  " + line}`).join("\n");
+    return <Text color={kind === "reasoning" ? "gray" : undefined} italic={kind === "reasoning"}>{lines}<Text color="gray">▌</Text></Text>;
 }
 
 export interface StartInteractiveParams {
@@ -102,11 +141,73 @@ export async function startInteractive(params: StartInteractiveParams): Promise<
     await app.waitUntilExit();
 }
 
+const PREVIEW_MESSAGES: MessageEntry[] = [
+    { id: 1, kind: "user", text: "修复 src/math.py 中 add 函数的实现" },
+    { id: 2, kind: "reasoning", text: "先读取目标文件，确认当前实现和需要修改的位置。" },
+    { id: 3, kind: "tool-call", text: 'read_file(path: "src/math.py")' },
+    { id: 4, kind: "tool-result", text: "def add(a, b):\n    return a * b" },
+    { id: 5, kind: "reasoning", text: "函数返回了乘积，需要改为返回两个参数的和。" },
+    { id: 6, kind: "tool-call", text: 'edit_file(path: "src/math.py", old_string: "return a * b", new_string: "return a + b")' },
+    { id: 7, kind: "tool-result", text: "文件修改成功" },
+    { id: 8, kind: "model", text: "已修复 add 函数，并完成文件验证。" },
+    { id: 9, kind: "done", text: "任务已完成\n（模型调用 2 次 · 工具调用 2 次 · token 1,248 · 耗时 3.2 秒）" },
+];
+
+export function PreviewApp(): React.ReactElement {
+    const { stdout } = useStdout();
+    const [messages, setMessages] = useState<MessageEntry[]>([]);
+    const [input, setInput] = useState("");
+    const contentWidth = Math.max(40, (stdout.columns ?? 80) - 2);
+
+    useEffect(() => {
+        let cancelled = false;
+        const replay = async (): Promise<void> => {
+            for (const message of PREVIEW_MESSAGES) {
+                await new Promise<void>((resolve) => setTimeout(resolve, 650));
+                if (cancelled) {
+                    return;
+                }
+                setMessages((previous) => [...previous, message]);
+            }
+        };
+        void replay();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    return (
+        <Box flexDirection="column">
+            <Box flexDirection="column" marginBottom={1}>
+                <Text color="cyan" bold>programmatic-coding-agent</Text>
+                <Text color="gray">界面预览 · code 模式 · 不会调用模型</Text>
+            </Box>
+            {messages.map((message) => (
+                <React.Fragment key={message.id}>{renderMessage(message, contentWidth)}</React.Fragment>
+            ))}
+            <Box marginTop={1} borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column">
+                <Box>
+                    <Text color="green" bold>❯ </Text>
+                    <TextInput value={input} onChange={setInput} onSubmit={() => setInput("")} focus />
+                </Box>
+                <Text color="gray">code · preview · {messages.length === PREVIEW_MESSAGES.length ? "演示完成" : "正在演示执行链路"}</Text>
+                <Text color="gray">按 Ctrl+C 退出预览</Text>
+            </Box>
+            <Text color="gray">{`预览进度 ${messages.length}/${PREVIEW_MESSAGES.length} · 按 Ctrl+C 退出`}</Text>
+        </Box>
+    );
+}
+
+export async function startPreview(): Promise<void> {
+    const app = render(<PreviewApp />);
+    await app.waitUntilExit();
+}
+
 export function App(props: AppProps): React.ReactElement {
     const { exit } = useApp();
     const { stdout } = useStdout();
     const { client, store, options } = props;
-    const separatorWidth = Math.max(20, (stdout.columns ?? 80) - 4);
+    const contentWidth = Math.max(40, (stdout.columns ?? 80) - 2);
 
     const [recordId, setRecordId] = useState(props.initialRecord.id);
     const [mode, setMode] = useState<Mode>(props.initialRecord.mode);
@@ -115,6 +216,7 @@ export function App(props: AppProps): React.ReactElement {
     const [input, setInput] = useState("");
     const [running, setRunning] = useState(false);
     const [streamingText, setStreamingText] = useState<string | null>(null);
+    const [streamingKind, setStreamingKind] = useState<"model" | "reasoning">("model");
 
     const recordRef = useRef<SessionRecord>(props.initialRecord);
     const contextRef = useRef<ContextManager>(props.initialContext);
@@ -139,10 +241,18 @@ export function App(props: AppProps): React.ReactElement {
     };
 
     const observer: AgentObserver = {
-        onRoundStart(round, maxRounds) {
-            push({ kind: "event", text: `[轮次 ${round}/${maxRounds}]` });
+        async onReasoningSummary(content) {
+            setStreamingKind("reasoning");
+            setStreamingText("");
+            for (const character of Array.from(content)) {
+                setStreamingText((previous) => `${previous ?? ""}${character}`);
+                await new Promise<void>((resolve) => setTimeout(resolve, TYPEWRITER_DELAY_MS));
+            }
+            push({ kind: "reasoning", text: content });
+            setStreamingText(null);
         },
         async onModelText(content) {
+            setStreamingKind("model");
             setStreamingText("");
             for (const character of Array.from(content)) {
                 setStreamingText((previous) => `${previous ?? ""}${character}`);
@@ -293,20 +403,25 @@ export function App(props: AppProps): React.ReactElement {
 
     return (
         <Box flexDirection="column">
-            <Text color="cyan" bold>
-                programmatic-coding-agent v0.1.0
-            </Text>
-            <Static items={messages}>{renderMessage}</Static>
+            <Box flexDirection="column" marginBottom={1}>
+                <Text color="cyan" bold>programmatic-coding-agent</Text>
+                <Text color="gray">本地编程智能体 · {mode} 模式</Text>
+            </Box>
+            {messages.map((message) => (
+                <React.Fragment key={message.id}>{renderMessage(message, contentWidth)}</React.Fragment>
+            ))}
             {streamingText !== null && (
-                <Text><Text color="magenta" bold>模型：</Text>{streamingText}<Text color="gray">▌</Text></Text>
+                renderStreamingText(streamingText, streamingKind)
             )}
-            <Box borderStyle="round" borderColor="cyan" paddingX={1}>
+            <Box marginTop={1} borderStyle="round" borderColor={running ? "yellow" : "cyan"} paddingX={1} flexDirection="column">
+                <Box>
+                    <Text color={running ? "yellow" : "green"} bold>{running ? "✳" : "❯"} </Text>
+                    <TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus />
+                </Box>
                 <Box flexDirection="column" width="100%">
-                    <Text color={running ? "yellow" : undefined}>{`${mode}> `}<TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus /></Text>
-                    <Text color="gray">{`\u2500`.repeat(separatorWidth)}</Text>
-                    <Text color="gray">
-                        会话 {recordId} ｜ 模型 {client.getModelName()} ｜ 工作目录 {workspace}
-                    </Text>
+                    <Text color="gray">{`模式 ${mode} · ${running ? "正在处理" : "就绪"}`}</Text>
+                    <Text color="gray">{`模型 ${client.getModelName()} · 会话 ${recordId}`}</Text>
+                    <Text color="gray">{`工作目录 ${workspace}`}</Text>
                 </Box>
             </Box>
         </Box>

@@ -14,6 +14,7 @@ export interface ChatMessage {
     content: string | null;
     tool_calls?: ToolCall[];
     tool_call_id?: string;
+    response_output_items?: unknown[];
 }
 
 export interface ToolSchema {
@@ -33,6 +34,7 @@ export interface ChatUsage {
 
 export interface ChatResult {
     message: ChatMessage;
+    reasoningSummary: string | null;
     finishReason: string;
     usage: ChatUsage;
     model: string;
