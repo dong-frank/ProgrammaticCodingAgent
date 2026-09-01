@@ -119,14 +119,36 @@ src/
 
 ## 对照实验
 
-```bash
-npm start -- benchmark                          # 全部任务 × 两种模式
-npm start -- benchmark --task single-func-fix   # 只运行指定任务
-npm start -- benchmark --mode tool              # 只运行指定模式（tool / code / all）
-npm start -- benchmark --reset                  # 只重建任务初始工作区，不运行实验
+Benchmark 会读取 `benchmark/tasks/` 下的全部任务，并针对每个任务分别运行 `tool` 与 `code` 两种模式。每次运行前，程序会根据 `task.json` 重建两个独立工作区：
+
+```text
+.workspace/benchmark/<任务 ID>/tool
+.workspace/benchmark/<任务 ID>/code
 ```
 
-任务定义位于 `benchmark/tasks/<任务 id>/`：`task.json` 提供任务描述与初始文件，`verify.py` 是独立验收脚本。每次运行自动重建隔离工作区（`.workspace/benchmark/`），保证两种模式从同一初始状态开始；运行后按任务对比两种模式的模型调用、工具调用、错误恢复次数、Token、端到端与模型 API 耗时，结果保存到 `benchmark/results/`。
+两种模式从相同的初始文件开始，验收脚本使用任务定义中的 `verifyCommand` 执行。实验结果会保存为带时间戳的 JSON 文件，其中包含工作区路径、完整消息轨迹、验收输出、模型调用次数、工具调用次数、错误恢复次数、Token 和耗时。
+
+### 复现实验
+
+确保已安装依赖并配置模型环境变量后，在项目根目录运行：
+
+```bash
+pca benchmark                                   # 全部任务 × 两种模式
+pca benchmark --task single-func-fix            # 只运行指定任务
+pca benchmark --mode tool                       # 只运行 tool 模式
+pca benchmark --mode code                       # 只运行 code 模式
+pca benchmark --reset                           # 只重建初始工作区，不调用模型
+```
+
+未全局安装时，将命令中的 `pca` 替换为 `npm start --`：
+
+```bash
+npm start -- benchmark
+```
+
+本次实验结果保存在 [`benchmark/results/benchmark-2026-09-01T09-19-17.783Z.json`](benchmark/results/benchmark-2026-09-01T09-19-17.783Z.json)。该结果包含 6 个任务、12 次模式运行，全部通过验收。
+
+任务定义位于 `benchmark/tasks/<任务 ID>/`：`task.json` 提供任务描述与初始文件，`verify.py` 是独立验收脚本。运行完成后，报告会按照任务比较两种模式的模型调用、工具调用、错误恢复次数、Token、端到端耗时与模型 API 耗时。
 
 ## 架构文档
 
