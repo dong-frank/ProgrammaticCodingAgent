@@ -31,6 +31,15 @@ function sessionPath(id: string): string {
     return path.join(sessionDir(), `${id}.json`);
 }
 
+export async function saveAgentProgram(sessionId: string, sequence: number, code: string): Promise<string> {
+    const directory = path.join(sessionDir(), sessionId);
+    await mkdir(directory, { recursive: true });
+    const filename = `exec-code-${String(sequence).padStart(3, "0")}-${Date.now()}.ts`;
+    const target = path.join(directory, filename);
+    await writeFile(target, code, { encoding: "utf8", mode: 0o600 });
+    return target;
+}
+
 function generateId(): string {
     const timestamp = Date.now().toString(36);
     const suffix = Math.random().toString(36).slice(2, 8);

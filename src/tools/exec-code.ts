@@ -1,7 +1,9 @@
 import type { ToolDefinition } from "./types.ts";
 import { executeAgentProgram } from "../executor/code-executor.ts";
+import { saveAgentProgram } from "../session/store.ts";
 
 export function execCodeTool(): ToolDefinition {
+    let sequence = 0;
     return {
         name: "exec_code",
         description:
@@ -20,9 +22,15 @@ export function execCodeTool(): ToolDefinition {
                     throw new Error("exec_code 参数 code 必须是非空字符串");
                 }
 
+                const savedPath = ctx.sessionId === undefined
+                    ? null
+                    : await saveAgentProgram(ctx.sessionId, sequence += 1, args.code);
                 const outcome = await executeAgentProgram(args.code, ctx.cwd, ctx.restrictToWorkspace, ctx.signal);
 
                 const lines: string[] = [];
+                if (savedPath !== null) {
+                    lines.push(`程序代码已保存：${savedPath}`);
+                }
                 const statusText = {
                     success: "正常",
                     "validation-error": "验证失败",

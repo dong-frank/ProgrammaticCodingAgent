@@ -23,6 +23,7 @@ export interface RunAgentParams {
     mode: Mode;
     maxRounds: number;
     workspace: string;
+    sessionId?: string;
     client: LlmClient;
     observer?: AgentObserver;
     context?: ContextManager;
@@ -134,6 +135,7 @@ export async function runAgent(params: RunAgentParams): Promise<AgentResult> {
             params.observer?.onToolCall?.(call.function.name, call.function.arguments);
             const result = await executeTool(config.registry, call.function.name, call.function.arguments, {
                 cwd: params.workspace,
+                sessionId: params.sessionId,
                 restrictToWorkspace: params.restrictToWorkspace,
                 signal: params.signal,
             });

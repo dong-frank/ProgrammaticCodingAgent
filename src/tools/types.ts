@@ -1,5 +1,6 @@
 export interface ToolContext {
     cwd: string;
+    sessionId?: string;
     restrictToWorkspace?: boolean;
     signal?: AbortSignal;
 }

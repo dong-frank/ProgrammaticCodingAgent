@@ -341,6 +341,7 @@ export function App(props: AppProps): React.ReactElement {
                 mode: modeRef.current,
                 maxRounds: options.maxRounds,
                 workspace: workspaceRef.current,
+                sessionId: recordRef.current.id,
                 client,
                 observer,
                 context: contextRef.current,
