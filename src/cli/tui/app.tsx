@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Box, Text, useApp, useStdout, render } from "ink";
+import { Box, Text, useApp, useInput, useStdout, render } from "ink";
 import TextInput from "ink-text-input";
 import { marked } from "marked";
 import TerminalRenderer from "marked-terminal";
@@ -8,7 +8,7 @@ import { ContextManager } from "../../agent/context-manager.ts";
 import { SessionStore, saveSession } from "../../session/store.ts";
 import type { SessionRecord } from "../../session/types.ts";
 import type { LlmClient } from "../../llm/client.ts";
-import { isMode, MODES, type Mode } from "../../modes/types.ts";
+import type { Mode } from "../../modes/types.ts";
 import { formatArgs } from "../ui.ts";
 import { MODEL_CONTEXT_WINDOW } from "../../llm/types.ts";
 
@@ -52,16 +52,27 @@ function contextIndicator(inputTokens: number): string {
 }
 
 const HELP_TEXT = [
+    "programmatic-coding-agent 是一个本地编程智能体。",
+    "它通过 Responses API 理解编程任务，并在当前工作目录中读取、修改文件和执行命令。",
+    "项目提供 code 与 tool 两种模式：code 模式通过 exec_code 执行程序，tool 模式逐次调用本地工具。",
+    "",
     "可用命令",
     "/help          显示本帮助",
     "/sessions      列出已保存的会话",
     "/session <id>  切换并恢复指定会话",
     "/new           保存当前会话并开始新会话",
-    "/mode          显示当前模式",
-    "/mode tool     切换为 Tool Calling 模式",
-    "/mode code     切换为 Code Mode",
-    "/quit          保存并退出（等价 /exit）",
+    "/mode          在 code 与 tool 模式之间切换",
+    "/exit          保存并退出",
 ].join("\n");
+
+const COMMAND_SUGGESTIONS = [
+    { command: "/help", description: "显示帮助" },
+    { command: "/sessions", description: "列出已保存的会话" },
+    { command: "/session", description: "切换并恢复指定会话" },
+    { command: "/new", description: "保存当前会话并开始新会话" },
+    { command: "/mode", description: "在 code 与 tool 模式之间切换" },
+    { command: "/exit", description: "保存并退出" },
+];
 
 function renderMessage(message: MessageEntry, width: number): React.ReactElement {
     const lines = message.text.split("\n");
@@ -228,6 +239,32 @@ export function App(props: AppProps): React.ReactElement {
     const [streamingKind, setStreamingKind] = useState<"model" | "reasoning">("model");
     const [contextTokens, setContextTokens] = useState(0);
     const [lastMetrics, setLastMetrics] = useState<AgentMetrics | null>(null);
+    const [selectedCommand, setSelectedCommand] = useState(0);
+
+    const commandQuery = input.trim().split(/\s+/)[0] ?? "";
+    const commandSuggestions = input.startsWith("/") && !/\s/.test(input)
+        ? COMMAND_SUGGESTIONS.filter((item) => item.command.startsWith(commandQuery))
+        : [];
+
+    useEffect(() => {
+        setSelectedCommand(0);
+    }, [input]);
+
+    useInput((_input, key) => {
+        if (commandSuggestions.length === 0) {
+            return;
+        }
+        if (key.upArrow) {
+            setSelectedCommand((current) => (current - 1 + commandSuggestions.length) % commandSuggestions.length);
+        } else if (key.downArrow) {
+            setSelectedCommand((current) => (current + 1) % commandSuggestions.length);
+        } else if (key.tab) {
+            const selected = commandSuggestions[selectedCommand];
+            if (selected !== undefined) {
+                setInput(`${selected.command} `);
+            }
+        }
+    });
 
     const recordRef = useRef<SessionRecord>(props.initialRecord);
     const contextRef = useRef<ContextManager>(props.initialContext);
@@ -336,14 +373,13 @@ export function App(props: AppProps): React.ReactElement {
                 break;
             case "/mode":
                 if (arg.length === 0) {
-                    push({ kind: "info", text: `当前模式：${modeRef.current}` });
-                } else if (isMode(arg)) {
-                    modeRef.current = arg;
-                    recordRef.current.mode = arg;
-                    setMode(arg);
-                    push({ kind: "info", text: `模式已切换为 ${arg}` });
+                    const nextMode = modeRef.current === "code" ? "tool" : "code";
+                    modeRef.current = nextMode;
+                    recordRef.current.mode = nextMode;
+                    setMode(nextMode);
+                    push({ kind: "info", text: `模式已切换为 ${nextMode}` });
                 } else {
-                    push({ kind: "error", text: `无效模式：${arg}，有效值为 ${MODES.join(" 或 ")}` });
+                    push({ kind: "error", text: "用法：/mode（不需要参数）" });
                 }
                 break;
             case "/sessions": {
@@ -420,7 +456,6 @@ export function App(props: AppProps): React.ReactElement {
         <Box flexDirection="column">
             <Box flexDirection="column" marginBottom={1}>
                 <Text color="cyan" bold>programmatic-coding-agent</Text>
-                <Text color="gray">本地编程智能体 · {mode} 模式</Text>
             </Box>
             {messages.map((message) => (
                 <React.Fragment key={message.id}>{renderMessage(message, contentWidth)}</React.Fragment>
@@ -429,6 +464,15 @@ export function App(props: AppProps): React.ReactElement {
                 renderStreamingText(streamingText, streamingKind)
             )}
             <Box marginTop={1} borderStyle="round" borderColor={running ? "yellow" : "cyan"} paddingX={1} flexDirection="column">
+                {commandSuggestions.length > 0 && (
+                    <Box flexDirection="column" marginBottom={1}>
+                        {commandSuggestions.map((item, index) => (
+                            <Text key={item.command} color={index === selectedCommand ? "cyan" : "gray"} bold={index === selectedCommand}>
+                                {`${index === selectedCommand ? "›" : " "} ${item.command.padEnd(12)} ${item.description}`}
+                            </Text>
+                        ))}
+                    </Box>
+                )}
                 <Box>
                     <Text color={running ? "yellow" : "green"} bold>{running ? "✳" : "❯"} </Text>
                     <TextInput value={input} onChange={setInput} onSubmit={handleSubmit} focus />
@@ -436,9 +480,9 @@ export function App(props: AppProps): React.ReactElement {
                 <Box flexDirection="column" width="100%">
                     <Text color="gray">{`模式 ${mode} · ${running ? "正在处理" : "就绪"}`}</Text>
                     <Text color="gray">{`模型 ${client.getModelName()} · 会话 ${recordId}`}</Text>
-                    <Text color="gray">{contextIndicator(contextTokens)}</Text>
-                    {lastMetrics !== null && <Text color="gray">{metricsSummary(lastMetrics)}</Text>}
                     <Text color="gray">{`工作目录 ${workspace}`}</Text>
+                    {lastMetrics !== null && <Text color="gray">{metricsSummary(lastMetrics)}</Text>}
+                    <Text color="gray">{contextIndicator(contextTokens)}</Text>
                 </Box>
             </Box>
         </Box>
