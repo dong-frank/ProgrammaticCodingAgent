@@ -77,7 +77,7 @@ export class LlmClient {
     ): Promise<OpenAI.Responses.Response> {
         const startedAt = Date.now();
         try {
-            return await this.client.responses.create(request, { signal });
+            return await this.client.responses.create({ model: this.model, ...request }, { signal });
         } catch (error) {
             if (error instanceof OpenAI.APIError) {
                 throw new Error(`模型接口返回 ${error.status}: ${error.message}`);

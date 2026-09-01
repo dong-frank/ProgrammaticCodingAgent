@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { inspect } from "node:util";
 import { Box, Text, useApp, useInput, useStdout, render } from "ink";
 import TextInput from "ink-text-input";
 import { marked } from "marked";
@@ -39,6 +40,16 @@ function formatDuration(ms: number): string {
         return `${ms} 毫秒`;
     }
     return `${(ms / 1000).toFixed(1)} 秒`;
+}
+
+function formatError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.stack ?? (error.message || "未知错误");
+    }
+    if (typeof error === "string") {
+        return error.length > 0 ? error : "未知错误";
+    }
+    return inspect(error, { depth: null, colors: false });
 }
 
 function metricsSummary(metrics: AgentMetrics): string {
@@ -107,7 +118,7 @@ function renderMessage(message: MessageEntry, width: number): React.ReactElement
                 </Box>
             );
         case "done":
-            return <Text color="green" bold>{body("✔ ")}</Text>;
+            return <></>;
         case "error":
             return <Text color="red">{body("✘ ")}</Text>;
         case "info":
@@ -296,8 +307,8 @@ export function App(props: AppProps): React.ReactElement {
                 setStreamingText((previous) => `${previous ?? ""}${character}`);
                 await new Promise<void>((resolve) => setTimeout(resolve, TYPEWRITER_DELAY_MS));
             }
-            push({ kind: "reasoning", text: content });
             setStreamingText(null);
+            push({ kind: "reasoning", text: content });
         },
         onContextUsage(inputTokens) {
             setContextTokens(inputTokens);
@@ -309,8 +320,8 @@ export function App(props: AppProps): React.ReactElement {
                 setStreamingText((previous) => `${previous ?? ""}${character}`);
                 await new Promise<void>((resolve) => setTimeout(resolve, TYPEWRITER_DELAY_MS));
             }
-            push({ kind: "model", text: content });
             setStreamingText(null);
+            push({ kind: "model", text: content });
         },
         onToolCall(name, rawArguments) {
             push({ kind: "tool-call", text: `${name}(${formatArgs(rawArguments)})` });
@@ -341,8 +352,7 @@ export function App(props: AppProps): React.ReactElement {
                 push({ kind: "error", text: "达到最大轮次未能完成任务" });
             }
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            push({ kind: "error", text: `运行失败：${message}` });
+            push({ kind: "error", text: `运行失败：\n${formatError(error)}` });
         }
         setRunning(false);
         busyRef.current = false;
@@ -457,9 +467,11 @@ export function App(props: AppProps): React.ReactElement {
             <Box flexDirection="column" marginBottom={1}>
                 <Text color="cyan" bold>programmatic-coding-agent</Text>
             </Box>
-            {messages.map((message) => (
+            {messages
+                .filter((message) => !(streamingText !== null && message.kind === streamingKind && message.text === streamingText))
+                .map((message) => (
                 <React.Fragment key={message.id}>{renderMessage(message, contentWidth)}</React.Fragment>
-            ))}
+                ))}
             {streamingText !== null && (
                 renderStreamingText(streamingText, streamingKind)
             )}
